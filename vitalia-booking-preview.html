@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VITALIA BEAUTY | קביעת תור</title>
+<style>
+:root{--bg:#090909;--panel:#171511;--gold:#d4af65;--muted:#d9cba9}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f3ead8;font-family:Arial,sans-serif;line-height:1.6}header{text-align:center;padding:55px 20px 35px;background:linear-gradient(145deg,#090909,#2c2114,#090909);border-bottom:1px solid #5a4627}h1{font:clamp(38px,8vw,64px) Georgia,serif;letter-spacing:3px;color:var(--gold);margin:0}header p{color:var(--muted);letter-spacing:1px}main{max-width:850px;margin:auto;padding:28px 18px 80px}h2{text-align:center;color:var(--gold);font-size:25px;margin:10px 0 24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}.card{background:var(--panel);border:1px solid #8b7145;border-radius:16px;padding:26px 20px;text-align:center}.card h3{color:var(--gold);margin:0 0 8px;font-size:23px}.card p{min-height:45px;color:#e0d6c4}.btn{display:inline-block;background:var(--gold);color:#14100a;border:0;border-radius:10px;padding:13px 24px;font-weight:bold;font-size:16px;cursor:pointer;text-decoration:none}.btn:focus-visible{outline:3px solid white}section{margin-top:35px}.panel{background:#15120e;border:1px solid #725d3a;border-radius:16px;padding:22px}.back{background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:9px;padding:9px 16px;cursor:pointer}.service{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #413728;padding:15px 0}.service:last-child{border:0}.service strong{display:block}.service small{color:#d7c7a7}.note{font-size:14px;color:#c6bba8;text-align:center;margin-top:22px}footer{text-align:center;padding:22px;color:#b7a780;font-size:13px}[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><h1 dir="ltr">VITALIA BEAUTY</h1><p>יופי שמתחיל בך</p></header>
+<main>
+<section id="choose"><h2>בחרי את הסניף שלך</h2><div class="grid">
+<div class="card"><h3 dir="ltr">Vitalia Beauty</h3><p>כפר יונה, נחל דלתון 34</p><button class="btn" onclick="showBranch('kfar')">בחירת סניף</button></div>
+<div class="card"><h3 dir="ltr">Vitalia Taieb</h3><p>נתניה, אמנון ותמר 6, קומה 2</p><button class="btn" onclick="showBranch('netanya')">בחירת סניף</button></div>
+</div></section>
+<section id="services" hidden><button class="back" onclick="goBack()">← חזרה לבחירת סניף</button><h2 id="branchTitle"></h2><div class="panel"><h3>בחירת טיפול</h3><div id="serviceList"></div></div><p class="note">המחירים וזמני הטיפולים יעודכנו בהמשך. קביעת תורים אונליין עדיין אינה פעילה.</p></section>
+<section id="next" hidden><button class="back" onclick="showBranch(currentBranch)">← חזרה לטיפולים</button><h2>קביעת תור</h2><div class="panel"><p id="selectedService"></p><p>יומן התורים המקוון יהיה זמין בקרוב.</p><p class="note">בשלב זה לא ניתן לשלוח או לאשר תור דרך האתר.</p></div></section>
+</main><footer>© VITALIA BEAUTY</footer>
+<script>
+const catalog={kfar:{name:'Vitalia Beauty — כפר יונה',services:['מניקור','פדיקור','איפור קבוע']},netanya:{name:'Vitalia Taieb — נתניה',services:['מניקור אוקראיני','בניית ציפורניים קצרות','בניית ציפורניים ארוכות','תיקון ציפורן בנויה','תיקון ציפורן','שינוי צורה','פדיקור רפואי לנשים','פדיקור רפואי לגברים','איפור קבוע גבות','איפור קבוע שפתיים','הדגשת קו הריסים']}};
+let currentBranch='';function showBranch(id){currentBranch=id;document.getElementById('choose').hidden=true;document.getElementById('next').hidden=true;document.getElementById('services').hidden=false;document.getElementById('branchTitle').textContent=catalog[id].name;const list=document.getElementById('serviceList');list.replaceChildren();catalog[id].services.forEach(name=>{const row=document.createElement('div');row.className='service';const label=document.createElement('strong');label.textContent=name;const btn=document.createElement('button');btn.className='btn';btn.textContent='בחירה';btn.addEventListener('click',()=>chooseService(name));row.append(label,btn);list.append(row)})}function chooseService(name){document.getElementById('services').hidden=true;document.getElementById('next').hidden=false;document.getElementById('selectedService').textContent=catalog[currentBranch].name+' — '+name}function goBack(){document.getElementById('services').hidden=true;document.getElementById('next').hidden=true;document.getElementById('choose').hidden=false}
+</script>
+</body></html>
