@@ -32,14 +32,32 @@ section{padding:28px 20px}
 </head>
 
 
+
 <script>
 function openBooking(salon) {
-  alert('Запис для салону: ' + salon);
+  document.getElementById('salonName').textContent = salon;
+  document.getElementById('booking').showModal();
 }
 </script>
 
-<body>
 
+
+
+<body>
+<dialog id="booking" dir="rtl">
+  <h2>קביעת תור</h2>
+  <p id="salonName"></p>
+  <form method="dialog">
+    <label>שם מלא</label>
+    <input type="text" required>
+    <label>טלפון</label>
+    <input type="tel" required>
+    <label>תאריך</label>
+    <input type="date" required>
+    <button type="button" onclick="alert('הטופס עדיין בבנייה')">המשך</button>
+    <button type="submit">סגירה</button>
+  </form>
+</dialog>
 <header>
 
 <h1>VITALIA <span class="gold">BEAUTY</span></h1>
