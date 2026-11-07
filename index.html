@@ -27,6 +27,50 @@ h1{font-family:Georgia,serif;font-size:44px;letter-spacing:4px;color:#d4af65;mar
 section{padding:28px 20px}
 
 .card{border:1px solid #a8874;padding:20px;border-radius:15px;margin-bottom:20px}
+ 
+ dialog#booking {
+  background: #111111;
+  color: #d4af65;
+  border: 1px solid #d4af65;
+  border-radius: 18px;
+  padding: 28px;
+  width: 90%;
+  max-width: 420px;
+  text-align: right;
+}
+
+dialog#booking::backdrop {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+#booking h2 {
+  text-align: center;
+  color: #d4af65;
+}
+
+#booking form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#booking input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d4af65;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+#booking button {
+  padding: 12px;
+  border: 1px solid #d4af65;
+  border-radius: 8px;
+  background: #d4af65;
+  color: #111111;
+  font-size: 16px;
+  cursor: pointer;
+}
  </style>
 
 </head>
@@ -54,7 +98,7 @@ function openBooking(salon) {
     <input type="tel" required>
     <label>תאריך</label>
     <input type="date" required>
-    <button type="button" onclick="alert('הטופס עדיין בבנייה')">המשך</button>
+    <button type="button" onclick="document.getElementById('booking').close()">ביטול</button
     <button type="submit">סגירה</button>
   </form>
 </dialog>
