@@ -82,6 +82,75 @@ function openBooking(salon) {
   document.getElementById('salonName').textContent = salon;
   document.getElementById('booking').showModal();
 }
+let calendarMonth = new Date();
+
+const hebrewMonths = [
+'ינואר','פברואר','מרץ','אפריל',
+'מאי','יוני','יולי','אוגוסט',
+'ספטמבר','אוקטובר','נובמבר','דצמבר'
+];
+
+const hebrewDays = ['א','ב','ג','ד','ה','ו','ש'];
+
+function openHebrewCalendar() {
+  document.getElementById('hebrewCalendar').style.display = 'block';
+  renderHebrewCalendar();
+}
+
+function changeMonth(n) {
+  calendarMonth.setDate(1);
+  calendarMonth.setMonth(calendarMonth.getMonth() + n);
+  renderHebrewCalendar();
+}
+
+function renderHebrewCalendar() {
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const grid = document.getElementById('calendarDays');
+
+  document.getElementById('calendarTitle').textContent =
+    hebrewMonths[month] + ' ' + year;
+
+  grid.innerHTML = '';
+
+  hebrewDays.forEach(day => {
+    const el = document.createElement('strong');
+    el.textContent = day;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const total = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  for (let i = 0; i < firstDay; i++) {
+    grid.appendChild(document.createElement('span'));
+  }
+
+  for (let day = 1; day <= total; day++) {
+    const date = new Date(year, month, day);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = day;
+    btn.disabled = date < today;
+    btn.style.cssText =
+      'padding:8px 0;background:#222;color:#d4af65;border:1px solid #d4af65;border-radius:6px';
+
+    btn.onclick = () => {
+      const input = document.getElementById('bookingDate');
+      input.value = new Intl.DateTimeFormat('he-IL', {
+        day:'numeric', month:'long', year:'numeric'
+      }).format(date);
+      input.dataset.iso = year + '-' +
+        String(month + 1).padStart(2,'0') + '-' +
+        String(day).padStart(2,'0');
+      document.getElementById('hebrewCalendar').style.display = 'none';
+    };
+
+    grid.appendChild(btn);
+  }
+}
 </script>
 
 
@@ -100,7 +169,15 @@ function openBooking(salon) {
     
 
 
-<input type="date" lang="he-IL" dir="rtl" required>
+<input type="text" id="bookingDate" placeholder="בחרי תאריך" readonly required onclick="openHebrewCalendar()
+   <div id="hebrewCalendar" dir="rtl" style="display:none;background:#111;color:#d4af65;border:1px solid #d4af65;border-radius:12px;padding:15px;margin-top:10px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<button type="button" onclick="changeMonth(-1)">❮</button>
+<strong id="calendarTitle"></strong>
+<button type="button" onclick="changeMonth(1)">❯</button>
+</div>
+<div id="calendarDays" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:15px;text-align:center"></div>
+</div>
    <label>בחרי טיפול</label>
 <select id="service" required>
   <option value="">בחרי טיפול</option>
