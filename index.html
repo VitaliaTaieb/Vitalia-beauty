@@ -91,13 +91,19 @@ function openBooking(salon) {
 <dialog id="booking" dir="rtl">
   <h2>קביעת תור</h2>
   <p id="salonName"></p>
-  <form method="dialog">
+  <form id="bookingForm" onsubmit="event.preventDefault(); alert('ההזמנה עדיין לא פעילה');">
     <label>שם מלא</label>
     <input type="text" required>
     <label>טלפון</label>
     <input type="tel" required>
     <label>תאריך</label>
     <input type="date" required>
+   <label>בחרי טיפול</label>
+<select id="service" required>
+  <option value="">בחרי טיפול</option>
+</select>
+   <label>בחרי שעה</label>
+<input type="time" id="bookingTime" required>
     <button type="button" onclick="document.getElementById('booking').close()">ביטול</button
     <button type="submit">סגירה</button>
   </form>
