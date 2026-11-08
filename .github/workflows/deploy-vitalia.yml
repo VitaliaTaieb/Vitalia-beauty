@@ -1,0 +1,15 @@
+name: Deploy VITALIA booking
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy booking function
+        run: supabase functions deploy vitalia-create-booking --project-ref nsazdqspilhjdtdkjgwg --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
