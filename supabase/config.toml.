@@ -1,0 +1,2 @@
+[functions.vitalia-create-booking]
+verify_jwt = false
