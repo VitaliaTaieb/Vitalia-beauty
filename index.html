@@ -47,7 +47,7 @@ const timeSelect=document.getElementById('bookingTime');
 const calendar=document.getElementById('hebrewCalendar');
 const statusEl=document.getElementById('status');
 const submitButton=document.getElementById('submitBooking');
-let selectedSalonId=null,services=[],slots=[],monthCursor=new Date(),activeDay='',turnstileToken='',widgetId=null,sending=false;
+let selectedSalonId=null,services=[],slots=[],breaks=[],monthCursor=new Date(),activeDay='',turnstileToken='',widgetId=null,sending=false;
 const dayFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'});
 const localFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const hebrewMonthFmt=new Intl.DateTimeFormat('he-IL',{month:'long',year:'numeric'});
@@ -78,13 +78,15 @@ window.openBooking=async function(salonId){
  calendar.hidden=true;setStatus('טוען פרטים…');dialog.showModal();refreshButton();renderTurnstile();
  monthCursor=new Date();monthCursor.setDate(1);
  try{
-  const [allServices,allSlots]=await Promise.all([
+  const [allServices,allSlots,allBreaks]=await Promise.all([
    readPublic('services',{select:'*',order:'name.asc',limit:'1000'}),
-   readPublic('available_slots',{select:'salon_id,work_date,start_time,end_time',salon_id:`eq.${salonId}`,work_date:`gte.${todayIsrael()}`,order:'work_date.asc',limit:'1000'})
+   readPublic('available_slots',{select:'salon_id,work_date,start_time,end_time',salon_id:`eq.${salonId}`,work_date:`gte.${todayIsrael()}`,order:'work_date.asc',limit:'1000'}),
+   readPublic('schedule_breaks',{select:'salon_id,work_date,start_time,end_time',salon_id:`eq.${salonId}`,work_date:`gte.${todayIsrael()}`,order:'work_date.asc',limit:'1000'})
   ]);
   if(selectedSalonId!==salonId)return;
   services=allServices.filter(s=>Number(s['salon_id.'])===salonId&&Number(s.duration_minutes)>0);
   slots=allSlots.filter(s=>Number(s.salon_id)===salonId);
+  breaks=allBreaks.filter(s=>Number(s.salon_id)===salonId);
   serviceSelect.replaceChildren(new Option('בחרי טיפול',''));
   for(const s of services)serviceSelect.add(new Option(`${s.name} — ₪${s.price}`,String(s.id)));
   serviceSelect.disabled=false;setStatus(services.length?'בחרי טיפול ותאריך.':'אין טיפולים זמינים כרגע.');renderCalendar();refreshButton();
@@ -108,11 +110,12 @@ function renderTimes(){
  timeSelect.replaceChildren(new Option('בחרי שעה',''));timeSelect.disabled=true;
  const service=services.find(s=>String(s.id)===serviceSelect.value);
  if(!service||!activeDay){setStatus('בחרי טיפול ותאריך.');refreshButton();return}
- const duration=Number(service.duration_minutes),starts=new Set();
+ const duration=Number(service.duration_minutes)+Number(service.break_after_minutes||0),starts=new Set();
+ const pauses=breaks.filter(x=>x.work_date===activeDay).map(x=>[timeToMinutes(x.start_time),timeToMinutes(x.end_time)]);
  for(const slot of slots.filter(s=>s.work_date===activeDay)){
   const start=timeToMinutes(slot.start_time),end=timeToMinutes(slot.end_time);
   if(!Number.isFinite(start)||!Number.isFinite(end))continue;
-  for(let t=Math.ceil(start/15)*15;t+duration<=end;t+=15){const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0');starts.add(`${hh}:${mm}`)}
+  for(let t=Math.ceil(start/15)*15;t+duration<=end;t+=15){if(pauses.some(([a,b])=>t<b&&t+duration>a))continue;const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0');starts.add(`${hh}:${mm}`)}
  }
  for(const t of [...starts].sort())timeSelect.add(new Option(t,t));
  timeSelect.disabled=starts.size===0;setStatus(starts.size?'בחרי שעה. הזמינות תיבדק שוב באישור.':'אין שעות מתאימות בתאריך זה.');refreshButton();
@@ -127,7 +130,7 @@ function getIsraelTimestamp(day,time){
  }
  return null;
 }
-const errorTexts={BOOKING_OVERLAP:'השעה הזו כבר תפוסה. אנא בחרי שעה אחרת.',SLOT_UNAVAILABLE:'השעה הזו אינה זמינה יותר.',SALON_CLOSED:'הסלון סגור בתאריך שבחרת.',CHALLENGE_FAILED:'אימות האבטחה נכשל. נסי שוב.',CHALLENGE_UNAVAILABLE:'האימות אינו זמין כעת. נסי שוב מאוחר יותר.'};
+const errorTexts={BOOKING_OVERLAP:'השעה הזו כבר תפוסה. אנא בחרי שעה אחרת.',SLOT_UNAVAILABLE:'השעה הזו אינה זמינה יותר.',DURING_BREAK:'השעה חופפת להפסקה. בחרי שעה אחרת.',SALON_CLOSED:'הסלון סגור בתאריך שבחרת.',CHALLENGE_FAILED:'אימות האבטחה נכשל. נסי שוב.',CHALLENGE_UNAVAILABLE:'האימות אינו זמין כעת. נסי שוב מאוחר יותר.'};
 document.getElementById('bookingForm').onsubmit=async event=>{
  event.preventDefault();if(sending||!turnstileToken)return;
  const startsAt=getIsraelTimestamp(dateInput.dataset.iso,timeSelect.value);
