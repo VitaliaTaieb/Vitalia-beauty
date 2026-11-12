@@ -13,9 +13,9 @@
 <body>
 <header><h1>VITALIA <span class="gold">BEAUTY</span></h1><p class="subtitle">יופי שמתחיל בך</p></header>
 <main>
-<section class="card"><h2>Vitalia Beauty — כפר יונה</h2><p>נחל דלתון 34</p><button type="button" onclick="openBooking(1)">לקביעת תור</button></section>
-<section class="card"><h2>Vitalia Taieb — נתניה</h2><p>אמנון ותמר 6, קומה 2</p><button type="button" onclick="openBooking(2)">לקביעת תור</button></section>
-</main>
+<section class="card"><h2>Vitalia Beauty — כפר יונה</h2><p id="address1">נחל דלתון 34</p><button type="button" onclick="openBooking(1)">לקביעת תור</button></section>
+<section class="card"><h2>Vitalia Taieb — נתניה</h2><p id="address2">אמנון ותמר 6</p><button type="button" onclick="openBooking(2)">לקביעת תור</button></section>
+<section class="card"><h2>התורים שלי</h2><p>לצפייה בתור השתמשי בקישור האישי שקיבלת באישור ההזמנה, או בקוד האישי ששמרת.</p><form id="lookupForm"><label for="lookupToken">קוד אישי</label><input id="lookupToken" dir="ltr" required pattern="[a-f0-9]{64}" style="width:100%;padding:12px"><button type="submit">הצגת התור</button></form><div id="myBookings" role="status"></div></section><p><a href="admin.html" style="color:var(--gold)">כניסת מנהלת</a></p></main>
 <dialog id="booking" aria-labelledby="bookingHeading" dir="rtl">
 <h2 id="bookingHeading">קביעת תור</h2><p id="salonName"></p>
 <form id="bookingForm">
@@ -28,7 +28,7 @@
 <div id="calendarDays" class="calendar-grid"></div>
 </div>
 <label for="bookingTime">בחרי שעה</label><select id="bookingTime" required disabled><option value="">בחרי תאריך וטיפול תחילה</option></select>
-<div id="turnstileWidget" aria-label="אימות אבטחה"></div>
+<label style="font-size:14px"><input id="whatsappConsent" type="checkbox" style="width:auto"> אני מסכימה לקבל תזכורת לתור ב־WhatsApp</label><div id="turnstileWidget" aria-label="אימות אבטחה"></div>
 <p id="status" class="helper" role="status" aria-live="polite"></p>
 <p class="helper">האישור הסופי יתקבל לאחר בדיקת זמינות התור.</p>
 <div class="actions"><button type="button" id="closeBooking" class="outline">סגירה</button><button type="submit" disabled id="submitBooking">אישור תור</button></div>
@@ -47,7 +47,7 @@ const timeSelect=document.getElementById('bookingTime');
 const calendar=document.getElementById('hebrewCalendar');
 const statusEl=document.getElementById('status');
 const submitButton=document.getElementById('submitBooking');
-let selectedSalonId=null,services=[],slots=[],breaks=[],monthCursor=new Date(),activeDay='',turnstileToken='',widgetId=null,sending=false;
+let selectedSalonId=null,services=[],slots=[],breaks=[],monthCursor=new Date(),activeDay='',turnstileToken='',widgetId=null,sending=false,completed=false,availability={},availabilityVersion=0;
 const dayFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'});
 const localFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const hebrewMonthFmt=new Intl.DateTimeFormat('he-IL',{month:'long',year:'numeric'});
@@ -56,7 +56,7 @@ const DOW=['א','ב','ג','ד','ה','ו','ש'];
 function isoLocal(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function todayIsrael(){const parts=dayFmt.formatToParts(new Date());const get=t=>parts.find(p=>p.type===t)?.value;return `${get('year')}-${get('month')}-${get('day')}`}
 function setStatus(message){statusEl.textContent=message}
-function refreshButton(){submitButton.disabled=sending||!turnstileToken||!selectedSalonId||!serviceSelect.value||!dateInput.dataset.iso||!timeSelect.value}
+function refreshButton(){submitButton.disabled=completed||sending||!turnstileToken||!selectedSalonId||!serviceSelect.value||!dateInput.dataset.iso||!timeSelect.value}
 function renderTurnstile(){
  if(!window.turnstile){setTimeout(()=>{if(dialog.open)renderTurnstile()},300);return}
  if(widgetId!==null){window.turnstile.reset(widgetId);turnstileToken='';refreshButton();return}
@@ -70,7 +70,7 @@ function renderTurnstile(){
 async function readPublic(table,params){const url=new URL(`${SUPABASE_URL}/rest/v1/${table}`);for(const [key,val] of Object.entries(params))url.searchParams.set(key,val);const res=await fetch(url,{headers:{apikey:SUPABASE_KEY,Accept:'application/json'}});if(!res.ok)throw Error(`Unable to load ${table}`);return await res.json()}
 window.openBooking=async function(salonId){
  if(!salons[salonId])return;
- selectedSalonId=salonId;services=[];slots=[];activeDay='';turnstileToken='';sending=false;
+ selectedSalonId=salonId;services=[];slots=[];activeDay='';turnstileToken='';sending=false;completed=false;availability={};
  document.getElementById('bookingForm').reset();delete dateInput.dataset.iso;
  document.getElementById('salonName').textContent=salons[salonId];
  serviceSelect.innerHTML='<option value="">טוען טיפולים…</option>';serviceSelect.disabled=true;
@@ -84,7 +84,7 @@ window.openBooking=async function(salonId){
    readPublic('schedule_breaks',{select:'salon_id,work_date,start_time,end_time',salon_id:`eq.${salonId}`,work_date:`gte.${todayIsrael()}`,order:'work_date.asc',limit:'1000'})
   ]);
   if(selectedSalonId!==salonId)return;
-  services=allServices.filter(s=>Number(s['salon_id.'])===salonId&&Number(s.duration_minutes)>0);
+  services=allServices.filter(s=>Number(s['salon_id.'])===salonId&&Number(s.duration_minutes)>0).filter((s,i,rows)=>rows.findIndex(x=>x.name===s.name&&Number(x.price)===Number(s.price)&&x.duration_minutes===s.duration_minutes&&x.break_after_minutes===s.break_after_minutes)===i);
   slots=allSlots.filter(s=>Number(s.salon_id)===salonId);
   breaks=allBreaks.filter(s=>Number(s.salon_id)===salonId);
   serviceSelect.replaceChildren(new Option('בחרי טיפול',''));
@@ -106,7 +106,14 @@ function renderCalendar(){
  }
 }
 function timeToMinutes(t){const m=/^(\d{2}):(\d{2})/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):NaN}
-function renderTimes(){
+async function renderTimes(){
+ const version=++availabilityVersion,day=activeDay,salon=selectedSalonId;
+ timeSelect.replaceChildren(new Option('טוען שעות…',''));timeSelect.disabled=true;refreshButton();
+ if(day&&salon){try{availability=await publicAction({action:'availability',salon_id:salon,date:day});}catch{if(version===availabilityVersion)setStatus('לא ניתן לבדוק זמינות. נסי שוב.');return;}}
+ if(version!==availabilityVersion||salon!==selectedSalonId)return;
+ const overrides=availability.overrides||[],closed=overrides.some(x=>x.is_closed)||(availability.holiday&&!overrides.some(x=>x.is_closed===false));
+ if(closed){timeSelect.replaceChildren(new Option('הסלון סגור בתאריך זה',''));timeSelect.disabled=true;setStatus(availability.holiday||'הסלון סגור');refreshButton();return;}
+
  timeSelect.replaceChildren(new Option('בחרי שעה',''));timeSelect.disabled=true;
  const service=services.find(s=>String(s.id)===serviceSelect.value);
  if(!service||!activeDay){setStatus('בחרי טיפול ותאריך.');refreshButton();return}
@@ -115,7 +122,7 @@ function renderTimes(){
  for(const slot of slots.filter(s=>s.work_date===activeDay)){
   const start=timeToMinutes(slot.start_time),end=timeToMinutes(slot.end_time);
   if(!Number.isFinite(start)||!Number.isFinite(end))continue;
-  for(let t=Math.ceil(start/15)*15;t+duration<=end;t+=15){if(pauses.some(([a,b])=>t<b&&t+duration>a))continue;const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0');starts.add(`${hh}:${mm}`)}
+  for(let t=Math.ceil(start/15)*15;t+duration<=end;t+=15){const stamp=getIsraelTimestamp(activeDay,String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));if(!stamp||new Date(stamp).getTime()<=Date.now())continue;const instant=new Date(stamp).getTime();if((availability.busy||[]).some(x=>instant<new Date(x.ends_at).getTime()&&instant+duration*60000>new Date(x.starts_at).getTime()))continue;const timed=overrides.filter(x=>x.start_time&&x.end_time);if(timed.length&&!timed.some(x=>t>=timeToMinutes(x.start_time)&&t+duration<=timeToMinutes(x.end_time)))continue;if(pauses.some(([a,b])=>t<b&&t+duration>a))continue;const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0');starts.add(`${hh}:${mm}`)}
  }
  for(const t of [...starts].sort())timeSelect.add(new Option(t,t));
  timeSelect.disabled=starts.size===0;setStatus(starts.size?'בחרי שעה. הזמינות תיבדק שוב באישור.':'אין שעות מתאימות בתאריך זה.');refreshButton();
@@ -137,10 +144,10 @@ document.getElementById('bookingForm').onsubmit=async event=>{
  if(!startsAt){setStatus('השעה שבחרת אינה תקינה.');return}
  sending=true;refreshButton();setStatus('מאשרים את התור…');
  try{
-  const response=await fetch(BOOKING_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify({salon_id:selectedSalonId,service_id:Number(serviceSelect.value),client_name:document.getElementById('clientName').value,client_phone:document.getElementById('clientPhone').value,starts_at:startsAt,turnstile_token:turnstileToken})});
+  const response=await fetch(BOOKING_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify({salon_id:selectedSalonId,service_id:Number(serviceSelect.value),client_name:document.getElementById('clientName').value,client_phone:document.getElementById('clientPhone').value,starts_at:startsAt,turnstile_token:turnstileToken,whatsapp_opt_in:document.getElementById('whatsappConsent').checked})});
   const result=await response.json().catch(()=>({}));
   if(!response.ok){setStatus(errorTexts[result.error]||'לא ניתן לאשר את התור. נסי שוב.');return}
-  setStatus('התור נקבע בהצלחה! מספר הזמנה: '+result.booking.id);submitButton.textContent='התור אושר';
+  completed=true;saveBooking(result);setStatus('התור נקבע בהצלחה! מספר הזמנה: '+result.booking.id+' · הקישור האישי נשמר באזור התורים שלי.');submitButton.textContent='התור אושר';
   document.getElementById('bookingForm').querySelectorAll('input,select').forEach(x=>x.disabled=true);
  }catch{setStatus('שגיאת תקשורת. בדקי את החיבור ונסי שוב.')}
  finally{sending=false;turnstileToken='';if(window.turnstile&&widgetId!==null)window.turnstile.reset(widgetId);refreshButton()}
@@ -148,9 +155,19 @@ document.getElementById('bookingForm').onsubmit=async event=>{
 document.getElementById('prevMonth').onclick=()=>{monthCursor.setDate(1);monthCursor.setMonth(monthCursor.getMonth()-1);renderCalendar()};
 document.getElementById('nextMonth').onclick=()=>{monthCursor.setDate(1);monthCursor.setMonth(monthCursor.getMonth()+1);renderCalendar()};
 dateInput.onclick=()=>{calendar.hidden=!calendar.hidden;if(!calendar.hidden)renderCalendar()};
-serviceSelect.onchange=renderTimes;timeSelect.onchange=refreshButton;
+serviceSelect.onchange=()=>{renderTimes().catch(()=>setStatus('לא ניתן לבדוק זמינות.'));};timeSelect.onchange=refreshButton;
 document.getElementById('closeBooking').onclick=()=>dialog.close();
 dialog.addEventListener('close',()=>{selectedSalonId=null;turnstileToken='';if(window.turnstile&&widgetId!==null)window.turnstile.reset(widgetId);submitButton.textContent='אישור תור';document.getElementById('bookingForm').querySelectorAll('input,select').forEach(x=>x.disabled=false)});
+
+async function publicAction(payload){const r=await fetch(BOOKING_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw Error(d.error||'SERVER_ERROR');return d;}
+function savedTokens(){try{return JSON.parse(localStorage.getItem('vitalia_my_bookings')||'[]').filter(x=>/^[a-f0-9]{64}$/.test(x)).slice(-30);}catch{return [];}}
+function saveBooking(result){if(!result.client_token)return;const tokens=[...new Set([...savedTokens(),result.client_token])];try{localStorage.setItem('vitalia_my_bookings',JSON.stringify(tokens.slice(-30)));}catch{}showBooking(result.client_token);}
+async function showBooking(token){const root=document.getElementById('myBookings');root.replaceChildren();try{const d=await publicAction({action:'my_booking',token}),card=document.createElement('p');card.textContent=d.salon.name+' · '+d.salon.address+' · '+d.service.name+' · '+new Date(d.booking.starts_at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})+' · '+(d.booking.status==='cancelled'?'בוטל':'מאושר');const a=document.createElement('a');a.href=location.origin+location.pathname+'#booking='+token;a.textContent='קישור אישי לתור — שמרי אותו';a.style.color='var(--gold)';const code=document.createElement('p');code.textContent='קוד אישי: '+token;code.style.overflowWrap='anywhere';root.append(card,a,code);}catch{root.textContent='לא ניתן למצוא את התור. בדקי את הקוד האישי ונסי שוב.';}}
+document.getElementById('lookupForm').onsubmit=e=>{e.preventDefault();showBooking(document.getElementById('lookupToken').value.trim());};
+const linked=/^#booking=([a-f0-9]{64})$/.exec(location.hash);if(linked)showBooking(linked[1]);else{const tokens=savedTokens();if(tokens.length){const select=document.createElement('select');for(const [i,token]of tokens.entries())select.add(new Option('הזמנה '+(i+1),token));select.onchange=()=>showBooking(select.value);document.getElementById('lookupForm').before(select);showBooking(tokens.at(-1));select.value=tokens.at(-1);}}
+readPublic('salons',{select:'id,address'}).then(rows=>{for(const r of rows){const el=document.getElementById('address'+r.id);if(el)el.textContent=r.address;}}).catch(()=>{});
+
 </script>
 </body>
 </html>
+
