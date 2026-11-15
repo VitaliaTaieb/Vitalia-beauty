@@ -99,7 +99,104 @@ function drawCalendar(){const root=$('adminCalendar');root.replaceChildren();con
 $('calendarMonth').value=localDay(new Date().toISOString()).slice(0,7);$('calendarMonth').onchange=()=>action(loadCalendar);$('calendarFilter').onchange=()=>action(loadCalendar);
 
 $('lang').value=lang;
-
+// VITALIA: денний календар. Вставити перед останнім translate(); у admin.html
+const originalDrawCalendar = drawCalendar;
+let dayViewRequest = 0;
+const dayClock = value => new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value));
+const dayMins = value => { const [h,m] = String(value).slice(0,5).split(':').map(Number); return h*60+m; };
+const dayTime = value => String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');
+const dayLabel = (uk,he) => lang==='he'?he:uk;
+function createDayView(){
+  let panel=$('vitaliaDayView');
+  if(panel)return panel;
+  panel=document.createElement('section');panel.id='vitaliaDayView';
+  panel.style.cssText='margin:18px 0;padding:14px;border:1px solid #d9b568;border-radius:14px;background:#151515';
+  const header=document.createElement('div');header.style.cssText='display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap';
+  const title=document.createElement('h2');title.id='vitaliaDayTitle';title.style.margin='0';
+  const controls=document.createElement('div');controls.className='actions';
+  for(const [delta,symbol] of [[-1,'‹'],[1,'›']]){
+    const button=node('button',symbol,'secondary');button.type='button';
+    button.onclick=()=>{const date=new Date(selectedCalendarDay+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+delta);
+      selectedCalendarDay=date.toISOString().slice(0,10);const month=selectedCalendarDay.slice(0,7);
+      if($('calendarMonth').value!==month){$('calendarMonth').value=month;action(loadCalendar);}else drawCalendar();};
+    controls.append(button);
+  }
+  header.append(title,controls);panel.append(header);
+  const schedule=node('div','','');schedule.id='vitaliaDaySchedule';panel.append(schedule);
+  $('adminCalendar').insertAdjacentElement('afterend',panel);
+  $('calendarDay').hidden=true;
+  const bookings=$('bookings');const description=bookings.previousElementSibling;const heading=description.previousElementSibling;
+  heading.hidden=true;description.hidden=true;bookings.hidden=true;
+  return panel;
+}
+function dayRow(from,to,kind,title,detail,booking){
+  const row=node('div','','');
+  row.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px;margin:7px 0;border-radius:9px;border:1px solid #5d4c2e;border-inline-start:5px solid '+(kind==='booking'?'#e5a18d':kind==='break'?'#9ca3af':'#d9b568');
+  const clock=node('b',dayTime(from)+'–'+dayTime(to));clock.style.cssText='color:#d9b568;min-width:110px';
+  const text=node('div','');text.style.cssText='flex:1;min-width:180px;overflow-wrap:anywhere';
+  text.append(node('strong',title));if(detail)text.append(node('div',detail,'muted'));
+  row.append(clock,text);
+  if(booking){const cancel=node('button',dayLabel('Скасувати','ביטול'),'danger');cancel.type='button';
+    cancel.onclick=()=>{if(!confirm(dayLabel('Скасувати цей запис?','לבטל את התור?')))return;
+      action(async()=>{await admin('cancel_booking',{id:booking.id});await load();});};row.append(cancel);}
+  return row;
+}
+async function renderDaySchedule(){
+  const request=++dayViewRequest,day=selectedCalendarDay,filter=Number($('calendarFilter').value);
+  const schedule=$('vitaliaDaySchedule');schedule.replaceChildren(node('p',dayLabel('Завантаження розкладу…','טוען יומן…'),'muted'));
+  $('vitaliaDayTitle').textContent=new Date(day+'T12:00:00Z').toLocaleDateString(lang==='he'?'he-IL':'uk-UA',{day:'numeric',month:'long',year:'numeric',weekday:'long'});
+  try{
+    const salons=filter?[filter]:[1,2];
+    const extra=await Promise.all(salons.map(id=>admin('list',{salon_id:id})));
+    if(request!==dayViewRequest)return;
+    schedule.replaceChildren();
+    for(let i=0;i<salons.length;i++){
+      const id=salons[i],data=extra[i],area=node('section','');
+      area.append(node('h3',id===1?'Vitalia Beauty · כפר יונה':'Vitalia Taieb · נתניה'));
+      const bookings=(calendarData.bookings||[]).filter(b=>b.status==='confirmed'&&Number(b.salon_id)===id&&localDay(b.starts_at)===day);
+      const slots=(calendarData.slots||[]).filter(s=>Number(s.salon_id)===id&&s.work_date===day).map(s=>({from:dayMins(s.start_time),to:dayMins(s.end_time)}));
+      const breaks=(data.breaks||[]).filter(b=>b.work_date===day).map(b=>({from:dayMins(b.start_time),to:dayMins(b.end_time)}));
+      const holiday=(calendarData.holidays||[]).find(h=>h.holiday_date===day);
+      const override=(data.overrides||[]).find(o=>o.override_date===day);
+      const closed=override?.is_closed===true||(holiday&&override?.is_closed!==false);
+      const events=[];
+      for(const b of bookings){const from=dayMins(dayClock(b.starts_at)),to=dayMins(dayClock(b.treatment_ends_at||b.ends_at));
+        events.push({from,to:Math.max(to,from+1),kind:'booking',booking:b});}
+      for(const b of breaks)events.push({...b,kind:'break'});
+      if(!closed){
+        const boundaries=new Set();
+        for(const s of slots){boundaries.add(s.from);boundaries.add(s.to);for(let t=Math.ceil(s.from/30)*30;t<s.to;t+=30)boundaries.add(t);}
+        for(const b of bookings){boundaries.add(dayMins(dayClock(b.starts_at)));boundaries.add(dayMins(dayClock(b.ends_at)));}
+        for(const b of breaks){boundaries.add(b.from);boundaries.add(b.to);}
+        const sorted=[...boundaries].sort((a,b)=>a-b);let last=null;
+        for(let k=0;k<sorted.length-1;k++){
+          const from=sorted[k],to=sorted[k+1];
+          const open=slots.some(s=>s.from<=from&&s.to>=to);
+          const busy=bookings.some(b=>dayMins(dayClock(b.starts_at))<to&&dayMins(dayClock(b.ends_at))>from)||breaks.some(b=>b.from<to&&b.to>from);
+          if(open&&!busy){if(last&&last.to===from)last.to=to;else{last={from,to,kind:'free'};events.push(last);}}
+          else last=null;
+        }
+      }
+      if(holiday)area.append(node('p',dayLabel('Єврейське свято: ','חג: ')+(holiday.name_he||''),'muted'));
+      if(closed)area.append(node('p',dayLabel('Дата закрита для онлайн-запису','היום סגור להזמנות'),'muted'));
+      if(!slots.length)area.append(node('p',dayLabel('Робочі години не відкриті','לא הוגדרו שעות עבודה'),'muted'));
+      if(!events.length)area.append(node('p',dayLabel('Немає записів або вільних годин','אין תורים או שעות פנויות'),'muted'));
+      events.sort((a,b)=>a.from-b.from||(['booking','break','free'].indexOf(a.kind)-['booking','break','free'].indexOf(b.kind)));
+      for(const e of events){if(e.kind==='booking')area.append(dayRow(e.from,e.to,e.kind,e.booking.client_name||dayLabel('Клієнт','לקוח'),(e.booking.service_name||'')+' · '+(e.booking.client_phone||''),e.booking));
+        else if(e.kind==='break')area.append(dayRow(e.from,e.to,e.kind,dayLabel('Перерва','הפסקה'),''));
+        else area.append(dayRow(e.from,e.to,e.kind,dayLabel('Вільний час','זמן פנוי'),dayLabel('Можливість запису залежить від тривалості процедури','הזמינות תלויה במשך הטיפול')));}
+      schedule.append(area);
+    }
+  }catch(err){if(request===dayViewRequest)schedule.replaceChildren(node('p',err.message||dayLabel('Помилка завантаження','שגיאה בטעינה'),'error'));}
+}
+drawCalendar=function(){
+  const month=$('calendarMonth').value;
+  if(!selectedCalendarDay.startsWith(month)){
+    const today=localDay(new Date().toISOString());selectedCalendarDay=today.startsWith(month)?today:month+'-01';
+  }
+  originalDrawCalendar();createDayView();renderDaySchedule();
+  $('adminCalendar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{$('vitaliaDayView').scrollIntoView({behavior:'smooth',block:'start'});}));
+}
 translate();
 </script>
 </body>
