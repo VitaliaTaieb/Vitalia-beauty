@@ -141,6 +141,19 @@ Deno.serve(async (req) => {
     });
     if (!inSlot) return reply({ error: "SLOT_UNAVAILABLE" }, 409, origin);
 
+    // Calendar breaks must be enforced server-side as well as in the booking UI.
+    const { data: dayBreaks, error: breaksError } = await db.from("schedule_breaks")
+      .select("start_time,end_time").eq("salon_id", salonId).eq("work_date", startLocal.date);
+    if (breaksError) {
+      console.error("schedule_breaks", breaksError);
+      return reply({ error: "SERVER_ERROR" }, 500, origin);
+    }
+    if ((dayBreaks ?? []).some((entry) => {
+      const a = minuteOfDay(entry.start_time);
+      const b = minuteOfDay(entry.end_time);
+      return a === null || b === null || (startLocal.minute < b && endLocal.minute > a);
+    })) return reply({ error: "BREAK_UNAVAILABLE" }, 409, origin);
+
     const timedOverrides = (overrides ?? []).filter((entry) =>
       entry.is_closed === false && (entry.start_time !== null || entry.end_time !== null));
     if (timedOverrides.length && !timedOverrides.some((entry) => {
