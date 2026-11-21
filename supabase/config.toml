@@ -1,2 +1,6 @@
 [functions.vitalia-create-booking]
 verify_jwt = false
+
+# The admin handler validates the user token with getUser and requires app_metadata.role.
+[functions.vitalia-admin]
+verify_jwt = false

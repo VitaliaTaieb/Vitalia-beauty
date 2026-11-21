@@ -1,0 +1,25 @@
+name: Validate VITALIA booking
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test booking and administrator handlers
+        run: node --test tests/booking.test.mjs
+      - name: Install browser test dependencies
+        run: |
+          npm install --prefix /tmp/vitalia-browser --no-save --package-lock=false playwright@1.62.1
+          node /tmp/vitalia-browser/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Test phone and tablet flows with simulated APIs
+        run: node tests/browser.cjs
+        env:
+          NODE_PATH: /tmp/vitalia-browser/node_modules
