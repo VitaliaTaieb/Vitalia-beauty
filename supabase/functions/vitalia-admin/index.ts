@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       const name = typeof input.name === 'string' ? input.name.trim() : '';
       if (!name || name.length > 200 || typeof input.price !== 'number' || !Number.isFinite(input.price) || input.price < 0 || input.price > 100000 ||
           !Number.isInteger(input.duration_minutes) || input.duration_minutes < 5 || input.duration_minutes > 720 ||
-          !Number.isInteger(input.break_after_minutes) || input.break_after_minutes < 0 || input.break_after_minutes > 240 ||
+          !Number.isInteger(input.break_after_minutes) || input.break_after_minutes < 0 || input.break_after_minutes > 1440 ||
           (input.id !== null && (!Number.isSafeInteger(input.id) || input.id < 1))) return reply({error:'INVALID_SERVICE'},400,origin);
       const values = {name,price:input.price,duration_minutes:input.duration_minutes,break_after_minutes:input.break_after_minutes};
       if(input.id!==null){
@@ -92,6 +92,67 @@ Deno.serve(async (req) => {
       const [bookings,slots,holidays,services]=await Promise.all([b,sl,db.from('booking_holidays').select('*').gte('holiday_date',start).lt('holiday_date',next),db.from('services').select('id,name')]);
       if(bookings.error||slots.error||holidays.error||services.error)throw bookings.error||slots.error||holidays.error||services.error;
       return reply({bookings:(bookings.data||[]).map(x=>({...x,service_name:services.data?.find(s=>s.id===x.service_id)?.name})),slots:slots.data,holidays:holidays.data},200,origin);
+    }
+    if(input.action==='reschedule_booking'){
+      const id=input.id, targetSalon=input.new_salon_id, newServiceId=input.service_id;
+      const stamp=input.starts_at;
+      if(!Number.isSafeInteger(id)||id<1||![1,2].includes(targetSalon)||
+         !Number.isSafeInteger(newServiceId)||newServiceId<1||
+         typeof stamp!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(?:\+02:00|\+03:00)$/.test(stamp))
+        return reply({error:'INVALID_RESCHEDULE'},400,origin);
+      const start=new Date(stamp);
+      if(!Number.isFinite(start.getTime())||start.getTime()<Date.now())
+        return reply({error:'INVALID_START'},400,origin);
+      const {data:old,error:oldErr}=await db.from('appointments').select('*').eq('id',id).maybeSingle();
+      if(oldErr)throw oldErr;
+      if(!old||old.status!=='confirmed')return reply({error:'BOOKING_NOT_FOUND'},404,origin);
+      const {data:service,error:serviceErr}=await db.from('services').select('*').eq('id',newServiceId).maybeSingle();
+      if(serviceErr)throw serviceErr;
+      if(!service||Number(service['salon_id.'])!==targetSalon)
+        return reply({error:'SERVICE_NOT_IN_SALON'},400,origin);
+      const originalStart=new Date(old.starts_at).getTime();
+      const oldTotal=(new Date(old.ends_at).getTime()-originalStart)/60000;
+      const oldTreatment=(new Date(old.treatment_ends_at||old.ends_at).getTime()-originalStart)/60000;
+      const changedService=Number(old.service_id)!==newServiceId;
+      const treatmentMinutes=changedService?Number(service.duration_minutes):oldTreatment;
+      const totalMinutes=changedService?Number(service.duration_minutes)+Number(service.break_after_minutes||0):oldTotal;
+      if(!Number.isFinite(totalMinutes)||!Number.isFinite(treatmentMinutes)||
+         treatmentMinutes<1||totalMinutes<treatmentMinutes||totalMinutes>1440)
+        return reply({error:'INVALID_DURATION'},400,origin);
+      const treatmentEnd=new Date(start.getTime()+treatmentMinutes*60000);
+      const end=new Date(start.getTime()+totalMinutes*60000);
+      const fmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+      const local=(d:Date)=>{
+        const p=fmt.formatToParts(d),get=(k:string)=>p.find(x=>x.type===k)?.value||'';
+        return {day:get('year')+'-'+get('month')+'-'+get('day'),time:get('hour')+':'+get('minute')};
+      };
+      const a=local(start),z=local(end);
+      if(!validDate(a.day)||a.day!==z.day||a.time>=z.time)
+        return reply({error:'OUTSIDE_WORKDAY'},400,origin);
+      const [slots,breaks,overrides,holiday]=await Promise.all([
+        db.from('available_slots').select('start_time,end_time').eq('salon_id',targetSalon).eq('work_date',a.day),
+        db.from('schedule_breaks').select('start_time,end_time').eq('salon_id',targetSalon).eq('work_date',a.day),
+        db.from('schedule_overrides').select('is_closed').eq('salon_id',targetSalon).eq('override_date',a.day),
+        db.from('booking_holidays').select('holiday_date').eq('holiday_date',a.day)
+      ]);
+      if(slots.error||breaks.error||overrides.error||holiday.error)throw slots.error||breaks.error||overrides.error||holiday.error;
+      const cut=(v:string)=>v.slice(0,5);
+      const opened=(slots.data||[]).some(x=>cut(x.start_time)<=a.time&&cut(x.end_time)>=z.time);
+      const blocked=(breaks.data||[]).some(x=>cut(x.start_time)<z.time&&cut(x.end_time)>a.time);
+      const o=(overrides.data||[])[0];
+      const closed=o?.is_closed===true||((holiday.data||[]).length>0&&o?.is_closed!==false);
+      if(!opened||closed)return reply({error:'SLOT_UNAVAILABLE'},409,origin);
+      if(blocked)return reply({error:'DURING_BREAK'},409,origin);
+      const {data:updated,error:updateError}=await db.from('appointments')
+        .update({salon_id:targetSalon,service_id:newServiceId,starts_at:start.toISOString(),
+          treatment_ends_at:treatmentEnd.toISOString(),ends_at:end.toISOString()})
+        .eq('id',id).eq('status','confirmed').select('id').maybeSingle();
+      if(updateError){
+        if(updateError.code==='23P01')return reply({error:'BOOKING_OVERLAP'},409,origin);
+        throw updateError;
+      }
+      if(!updated)return reply({error:'BOOKING_NOT_FOUND'},404,origin);
+      return reply({saved:true,id:updated.id,starts_at:start.toISOString()},200,origin);
     }
     if(input.action==='cancel_booking'){
       if(!Number.isSafeInteger(input.id)||input.id<1)return reply({error:'INVALID_ID'},400,origin);
@@ -166,7 +227,7 @@ Deno.serve(async (req) => {
     }
     if (input.action === "set_service_break") {
       if (!Number.isSafeInteger(input.service_id) || input.service_id < 1 ||
-          !Number.isInteger(input.minutes) || input.minutes < 0 || input.minutes > 240) {
+          !Number.isInteger(input.minutes) || input.minutes < 0 || input.minutes > 1440) {
         return reply({ error: "INVALID_SERVICE_BREAK" }, 400, origin);
       }
       const { data: existingService, error: readError } = await db.from("services").select("*").eq("id", input.service_id).maybeSingle();

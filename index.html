@@ -84,7 +84,7 @@ window.openBooking=async function(salonId){
    readPublic('schedule_breaks',{select:'salon_id,work_date,start_time,end_time',salon_id:`eq.${salonId}`,work_date:`gte.${todayIsrael()}`,order:'work_date.asc',limit:'1000'})
   ]);
   if(selectedSalonId!==salonId)return;
-  services=allServices.filter(s=>Number(s['salon_id.'])===salonId&&Number(s.duration_minutes)>0).filter((s,i,rows)=>rows.findIndex(x=>x.name===s.name&&Number(x.price)===Number(s.price)&&x.duration_minutes===s.duration_minutes&&x.break_after_minutes===s.break_after_minutes)===i);
+  services=allServices.filter(s=>Number(s['salon_id.'])===salonId&&!s.import_only&&Number(s.duration_minutes)>0).filter((s,i,rows)=>rows.findIndex(x=>x.name===s.name&&Number(x.price)===Number(s.price)&&x.duration_minutes===s.duration_minutes&&x.break_after_minutes===s.break_after_minutes)===i);
   slots=allSlots.filter(s=>Number(s.salon_id)===salonId);
   breaks=allBreaks.filter(s=>Number(s.salon_id)===salonId);
   serviceSelect.replaceChildren(new Option('בחרי טיפול',''));
