@@ -47,7 +47,7 @@ const timeSelect=document.getElementById('bookingTime');
 const calendar=document.getElementById('hebrewCalendar');
 const statusEl=document.getElementById('status');
 const submitButton=document.getElementById('submitBooking');
-let selectedSalonId=null,services=[],slots=[],breaks=[],monthCursor=new Date(),activeDay='',turnstileToken='',widgetId=null,sending=false,completed=false,availability={},availabilityVersion=0;
+let selectedSalonId=null,services=[],slots=[],breaks=[],monthCursor=new Date(),activeDay='',turnstileToken='',widgetId=null,sending=false,completed=false,availableDays=new Map(),availabilityVersion=0;
 const dayFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'});
 const localFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const hebrewMonthFmt=new Intl.DateTimeFormat('he-IL',{month:'long',year:'numeric'});
@@ -70,13 +70,13 @@ function renderTurnstile(){
 async function readPublic(table,params){const url=new URL(`${SUPABASE_URL}/rest/v1/${table}`);for(const [key,val] of Object.entries(params))url.searchParams.set(key,val);const res=await fetch(url,{headers:{apikey:SUPABASE_KEY,Accept:'application/json'}});if(!res.ok)throw Error(`Unable to load ${table}`);return await res.json()}
 window.openBooking=async function(salonId){
  if(!salons[salonId])return;
- selectedSalonId=salonId;services=[];slots=[];activeDay='';turnstileToken='';sending=false;completed=false;availability={};
+ selectedSalonId=salonId;services=[];slots=[];activeDay='';turnstileToken='';sending=false;completed=false;availableDays.clear();availabilityVersion++;
  document.getElementById('bookingForm').reset();delete dateInput.dataset.iso;
  document.getElementById('salonName').textContent=salons[salonId];
- serviceSelect.innerHTML='<option value="">טוען טיפולים…</option>';serviceSelect.disabled=true;
+ serviceSelect.innerHTML='<option value="">טוען טיפולים…</option>';serviceSelect.disabled=true;dateInput.disabled=true;
  timeSelect.innerHTML='<option value="">בחרי תאריך וטיפול תחילה</option>';timeSelect.disabled=true;
  calendar.hidden=true;setStatus('טוען פרטים…');dialog.showModal();refreshButton();renderTurnstile();
- monthCursor=new Date();monthCursor.setDate(1);
+ const [year,month]=todayIsrael().split('-').map(Number);monthCursor=new Date(year,month-1,1);
  try{
   const [allServices,allSlots,allBreaks]=await Promise.all([
    readPublic('services',{select:'*',order:'name.asc',limit:'1000'}),
@@ -96,36 +96,62 @@ function renderCalendar(){
  const grid=document.getElementById('calendarDays');grid.replaceChildren();
  const y=monthCursor.getFullYear(),m=monthCursor.getMonth();
  document.getElementById('calendarTitle').textContent=hebrewMonthFmt.format(new Date(y,m,1));
+ document.getElementById('prevMonth').disabled=isoLocal(monthCursor).slice(0,7)<=todayIsrael().slice(0,7);
  for(const d of DOW){const header=document.createElement('strong');header.textContent=d;grid.append(header)}
- const first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),available=new Set(slots.map(s=>s.work_date)),today=todayIsrael();
+ const first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),available=availableDays,today=todayIsrael();
  for(let i=0;i<first;i++){const blank=document.createElement('span');blank.className='empty';grid.append(blank)}
  for(let d=1;d<=days;d++){
   const date=new Date(y,m,d),key=isoLocal(date),btn=document.createElement('button');btn.type='button';btn.textContent=String(d);
   btn.disabled=key<today||!available.has(key);if(available.has(key)&&key>=today)btn.classList.add('available');if(key===activeDay)btn.classList.add('selected');
-  btn.onclick=()=>{activeDay=key;dateInput.value=hebrewDateFmt.format(date);dateInput.dataset.iso=key;calendar.hidden=true;renderTimes();};grid.append(btn)
+  btn.onclick=()=>{activeDay=key;dateInput.value=hebrewDateFmt.format(date);dateInput.dataset.iso=key;calendar.hidden=true;renderTimes(availableDays.get(key));};grid.append(btn)
  }
 }
 function timeToMinutes(t){const m=/^(\d{2}):(\d{2})/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):NaN}
-async function renderTimes(){
- const version=++availabilityVersion,day=activeDay,salon=selectedSalonId;
- timeSelect.replaceChildren(new Option('טוען שעות…',''));timeSelect.disabled=true;refreshButton();
- if(day&&salon){try{availability=await publicAction({action:'availability',salon_id:salon,date:day});}catch{if(version===availabilityVersion)setStatus('לא ניתן לבדוק זמינות. נסי שוב.');return;}}
- if(version!==availabilityVersion||salon!==selectedSalonId)return;
- const overrides=availability.overrides||[],closed=overrides.some(x=>x.is_closed)||(availability.holiday&&!overrides.some(x=>x.is_closed===false));
- if(closed){timeSelect.replaceChildren(new Option('הסלון סגור בתאריך זה',''));timeSelect.disabled=true;setStatus(availability.holiday||'הסלון סגור');refreshButton();return;}
-
- timeSelect.replaceChildren(new Option('בחרי שעה',''));timeSelect.disabled=true;
- const service=services.find(s=>String(s.id)===serviceSelect.value);
- if(!service||!activeDay){setStatus('בחרי טיפול ותאריך.');refreshButton();return}
+function matchingTimes(day, service, availability){
+ const overrides=availability.overrides||[];
+ if(overrides.some(x=>x.is_closed)||(availability.holiday&&!overrides.some(x=>x.is_closed===false)))return [];
  const duration=Number(service.duration_minutes)+Number(service.break_after_minutes||0),starts=new Set();
- const pauses=breaks.filter(x=>x.work_date===activeDay).map(x=>[timeToMinutes(x.start_time),timeToMinutes(x.end_time)]);
- for(const slot of slots.filter(s=>s.work_date===activeDay)){
+ const pauses=breaks.filter(x=>x.work_date===day).map(x=>[timeToMinutes(x.start_time),timeToMinutes(x.end_time)]);
+ for(const slot of slots.filter(s=>s.work_date===day)){
   const start=timeToMinutes(slot.start_time),end=timeToMinutes(slot.end_time);
   if(!Number.isFinite(start)||!Number.isFinite(end))continue;
-  for(let t=Math.ceil(start/15)*15;t+duration<=end;t+=15){const stamp=getIsraelTimestamp(activeDay,String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));if(!stamp||new Date(stamp).getTime()<=Date.now())continue;const instant=new Date(stamp).getTime();if((availability.busy||[]).some(x=>instant<new Date(x.ends_at).getTime()&&instant+duration*60000>new Date(x.starts_at).getTime()))continue;const timed=overrides.filter(x=>x.start_time&&x.end_time);if(timed.length&&!timed.some(x=>t>=timeToMinutes(x.start_time)&&t+duration<=timeToMinutes(x.end_time)))continue;if(pauses.some(([a,b])=>t<b&&t+duration>a))continue;const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0');starts.add(`${hh}:${mm}`)}
+  for(let t=Math.ceil(start/15)*15;t+duration<=end;t+=15){const stamp=getIsraelTimestamp(day,String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));if(!stamp||new Date(stamp).getTime()<=Date.now())continue;const instant=new Date(stamp).getTime();if((availability.busy||[]).some(x=>instant<new Date(x.ends_at).getTime()&&instant+duration*60000>new Date(x.starts_at).getTime()))continue;const timed=overrides.filter(x=>x.start_time&&x.end_time);if(timed.length&&!timed.some(x=>t>=timeToMinutes(x.start_time)&&t+duration<=timeToMinutes(x.end_time)))continue;if(pauses.some(([a,b])=>t<b&&t+duration>a))continue;const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0');starts.add(`${hh}:${mm}`)}
  }
- for(const t of [...starts].sort())timeSelect.add(new Option(t,t));
- timeSelect.disabled=starts.size===0;setStatus(starts.size?'בחרי שעה. הזמינות תיבדק שוב באישור.':'אין שעות מתאימות בתאריך זה.');refreshButton();
+ return [...starts].sort();
+}
+function renderTimes(times){
+ timeSelect.replaceChildren(new Option('בחרי שעה',''),...times.map(t=>new Option(t,t)));
+ timeSelect.disabled=times.length===0;
+ setStatus(times.length?'בחרי שעה. הזמינות תיבדק שוב באישור.':'אין שעות מתאימות בתאריך זה.');
+ refreshButton();
+}
+
+async function loadCalendarAvailability(){
+ const version=++availabilityVersion,salon=selectedSalonId;
+ const service=services.find(s=>String(s.id)===serviceSelect.value);
+ availableDays=new Map();activeDay='';dateInput.value='';delete dateInput.dataset.iso;
+ timeSelect.replaceChildren(new Option('בחרי תאריך תחילה',''));timeSelect.disabled=true;
+ dateInput.disabled=!service;calendar.hidden=!service;refreshButton();renderCalendar();
+ if(!service){setStatus('בחרי טיפול.');return}
+ setStatus('טוען תאריכים פנויים לטיפול…');
+ const today=todayIsrael(),month=isoLocal(monthCursor).slice(0,7);
+ const candidates=[...new Set(slots.filter(slot=>slot.work_date>=today&&slot.work_date.slice(0,7)===month).map(slot=>slot.work_date))]
+  .filter(day=>matchingTimes(day,service,{}).length);
+ let failed=false;
+ for(let i=0;i<candidates.length;i+=5){
+  const results=await Promise.allSettled(candidates.slice(i,i+5).map(async day=>{
+   const availability=await publicAction({action:'availability',salon_id:salon,date:day});
+   return [day,matchingTimes(day,service,availability)];
+  }));
+  if(version!==availabilityVersion||!dialog.open)return;
+  for(const result of results){
+   if(result.status==='rejected'){failed=true;continue}
+   const [day,times]=result.value;
+   if(times.length)availableDays.set(day,times);
+  }
+ }
+ renderCalendar();
+ setStatus(failed?'חלק מהתאריכים לא נטענו. אפשר לבחור את הטיפול מחדש.':availableDays.size?'בחרי תאריך פנוי לטיפול.':'אין תורים פנויים לטיפול בחודש הזה. עברי לחודש אחר.');
 }
 function getIsraelTimestamp(day,time){
  // For Israeli standard/DST hours choose the offset that maps to the desired wall time.
@@ -152,10 +178,10 @@ document.getElementById('bookingForm').onsubmit=async event=>{
  }catch{setStatus('שגיאת תקשורת. בדקי את החיבור ונסי שוב.')}
  finally{sending=false;turnstileToken='';if(window.turnstile&&widgetId!==null)window.turnstile.reset(widgetId);refreshButton()}
 };
-document.getElementById('prevMonth').onclick=()=>{monthCursor.setDate(1);monthCursor.setMonth(monthCursor.getMonth()-1);renderCalendar()};
-document.getElementById('nextMonth').onclick=()=>{monthCursor.setDate(1);monthCursor.setMonth(monthCursor.getMonth()+1);renderCalendar()};
+document.getElementById('prevMonth').onclick=()=>{monthCursor.setDate(1);monthCursor.setMonth(monthCursor.getMonth()-1);loadCalendarAvailability()};
+document.getElementById('nextMonth').onclick=()=>{monthCursor.setDate(1);monthCursor.setMonth(monthCursor.getMonth()+1);loadCalendarAvailability()};
 dateInput.onclick=()=>{calendar.hidden=!calendar.hidden;if(!calendar.hidden)renderCalendar()};
-serviceSelect.onchange=()=>{renderTimes().catch(()=>setStatus('לא ניתן לבדוק זמינות.'));};timeSelect.onchange=refreshButton;
+serviceSelect.onchange=loadCalendarAvailability;timeSelect.onchange=refreshButton;
 document.getElementById('closeBooking').onclick=()=>dialog.close();
 dialog.addEventListener('close',()=>{selectedSalonId=null;turnstileToken='';if(window.turnstile&&widgetId!==null)window.turnstile.reset(widgetId);submitButton.textContent='אישור תור';document.getElementById('bookingForm').querySelectorAll('input,select').forEach(x=>x.disabled=false)});
 
