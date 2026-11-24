@@ -62,6 +62,48 @@ Deno.serve(async (req) => {
   if (!Number.isInteger(salon) || ![1, 2].includes(salon)) return reply({ error: "SALON" }, 400, origin);
   const db = dbClient(url, secret);
   try {
+
+    if (input.action === 'create_booking') {
+      const serviceId = input.service_id;
+      const clientName = typeof input.client_name === 'string' ? input.client_name.trim() : '';
+      const clientPhone = typeof input.client_phone === 'string' ? input.client_phone.trim() : '';
+      const stamp = input.starts_at;
+      const token = input.token;
+      if (!Number.isSafeInteger(serviceId) || serviceId < 1 || !clientName || clientName.length > 120 ||
+          !/^[+0-9().\s-]{7,25}$/.test(clientPhone) || !/^\d{7,15}$/.test(clientPhone.replace(/\D/g, '')) ||
+          typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token) || typeof stamp !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(stamp)) {
+        return reply({error: 'INVALID_BOOKING_DATA'}, 400, origin);
+      }
+      const start = new Date(stamp);
+      if (!Number.isFinite(start.getTime()) || start.toISOString() !== stamp) {
+        return reply({error: 'INVALID_BOOKING_TIME'}, 400, origin);
+      }
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+      const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      const prior = () => db.from('appointments').select('id').eq('client_token_hash', hash).maybeSingle();
+      const existing = await prior();
+      if (existing.error) throw existing.error;
+      if (existing.data) return reply({id: existing.data.id, client_token: token}, 200, origin);
+      // The database validates service ownership, working hours, closures, breaks and conflicts.
+      const {data, error} = await db.from('appointments').insert({
+        salon_id: salon, service_id: serviceId, starts_at: stamp, ends_at: stamp,
+        client_name: clientName, client_phone: clientPhone, client_token_hash: hash,
+        status: 'confirmed', whatsapp_opt_in: false,
+      }).select('id').single();
+      if (!error) return reply({id: data.id, client_token: token}, 201, origin);
+      if (error.code === '23P01' || error.code === '23505') {
+        const retry = await prior();
+        if (retry.error) throw retry.error;
+        if (retry.data) return reply({id: retry.data.id, client_token: token}, 200, origin);
+        if (error.code === '23P01') return reply({error: 'BOOKING_OVERLAP'}, 409, origin);
+      }
+      if (['SERVICE_NOT_FOUND', 'INVALID_SERVICE_DURATION', 'INVALID_BOOKING_TIME', 'SALON_CLOSED',
+          'SLOT_UNAVAILABLE', 'OUTSIDE_OVERRIDE', 'DURING_BREAK'].includes(error.message)) {
+        return reply({error: error.message}, 409, origin);
+      }
+      throw error;
+    }
     if (input.action === 'save_service') {
       const name = typeof input.name === 'string' ? input.name.trim() : '';
       if (!name || name.length > 200 || typeof input.price !== 'number' || !Number.isFinite(input.price) || input.price < 0 || input.price > 100000 ||
