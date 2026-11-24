@@ -36,6 +36,19 @@
 <section class="card"><p id="holidayHelp">Основні єврейські свята закриті автоматично. «Скасувати закриття» дозволяє запис у свято, якщо відкриті робочі години.</p><p id="whatsappState"></p><h2 data-t="closures">Закриті дати</h2><div id="closures" class="muted"></div></section></section>
 <div id="status" role="status" aria-live="polite" class="status hidden"></div>
 </main>
+<dialog id="manualBooking" aria-labelledby="manualTitle" style="width:min(92vw,530px);max-height:90vh;overflow:auto;background:#181818;color:#f5eddd;border:1px solid #79673f;border-radius:14px;padding:20px">
+<h2 id="manualTitle"></h2><p id="manualContext"></p>
+<form id="manualForm">
+<div class="grid">
+<div><label for="manualService" id="manualServiceLabel"></label><select id="manualService" required></select></div>
+<div><label for="manualTime" id="manualTimeLabel"></label><input id="manualTime" type="time" required></div>
+<div><label for="manualName" id="manualNameLabel"></label><input id="manualName" maxlength="120" required></div>
+<div><label for="manualPhone" id="manualPhoneLabel"></label><input id="manualPhone" type="tel" dir="ltr" maxlength="25" required></div>
+</div>
+<p id="manualStatus" role="status"></p><p id="manualLink"></p>
+<div class="actions"><button id="manualSubmit" type="submit"></button><button id="manualClose" type="button" class="secondary"></button></div>
+</form>
+</dialog>
 <script type="module">
 const BASE='https://nsazdqspilhjdtdkjgwg.supabase.co';
 const KEY='sb_publishable_akdZUTsjf7rT7bGrBl85_A_sex-4Oas';
@@ -106,6 +119,94 @@ const dayClock = value => new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Jerus
 const dayMins = value => { const [h,m] = String(value).slice(0,5).split(':').map(Number); return h*60+m; };
 const dayTime = value => String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');
 const dayLabel = (uk,he) => lang==='he'?he:uk;
+
+const manualDialog = $('manualBooking');
+const manualForm = $('manualForm');
+let manualSelection, manualPending, manualSaving = false;
+
+function openManualBooking(day, salonId, services) {
+  manualSelection = {day, salonId};
+  manualPending = null;
+  manualForm.reset();
+  $('manualTitle').textContent = dayLabel('Додати запис', 'הוספת תור');
+  $('manualContext').textContent = day + ' · ' + (salonId === 1 ? 'Vitalia Beauty · כפר יונה' : 'Vitalia Taieb · נתניה');
+  $('manualServiceLabel').textContent = dayLabel('Процедура', 'טיפול');
+  $('manualTimeLabel').textContent = dayLabel('Час', 'שעה');
+  $('manualNameLabel').textContent = dayLabel('Ім’я клієнта', 'שם הלקוח');
+  $('manualPhoneLabel').textContent = dayLabel('Телефон клієнта', 'טלפון הלקוח');
+  $('manualSubmit').textContent = dayLabel('Зберегти запис', 'שמירת תור');
+  $('manualClose').textContent = dayLabel('Закрити', 'סגירה');
+  $('manualStatus').textContent = '';
+  $('manualLink').replaceChildren();
+  $('manualSubmit').disabled = false;
+  $('manualService').replaceChildren(new Option(dayLabel('Оберіть процедуру', 'בחרי טיפול'), ''),
+    ...services.map(service => new Option(service.name, service.id)));
+  for (const field of manualForm.querySelectorAll('input, select')) field.disabled = false;
+  manualDialog.showModal();
+}
+$('manualClose').onclick = () => manualDialog.close();
+manualDialog.addEventListener('cancel', event => { if (manualSaving) event.preventDefault(); });
+manualForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (manualSaving || !manualForm.reportValidity()) return;
+  const {day, salonId} = manualSelection;
+  const clock = $('manualTime').value;
+  const stamp = ['+02:00', '+03:00'].map(offset => day + 'T' + clock + ':00' + offset)
+    .find(candidate => localDay(candidate) === day && dayClock(candidate) === clock);
+  const status = $('manualStatus');
+  if (!stamp || Date.parse(stamp) <= Date.now()) {
+    status.textContent = dayLabel('Оберіть дійсний майбутній час.', 'בחרי שעה עתידית תקינה.');
+    return;
+  }
+  const details = {
+    salon_id: salonId, service_id: Number($('manualService').value), starts_at: new Date(stamp).toISOString(),
+    client_name: $('manualName').value.trim(), client_phone: $('manualPhone').value.trim(),
+  };
+  const signature = JSON.stringify(details);
+  if (manualPending?.signature !== signature) {
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), part => part.toString(16).padStart(2, '0')).join('');
+    manualPending = {signature, token};
+  }
+  manualSaving = true;
+  $('manualSubmit').disabled = $('manualClose').disabled = true;
+  const fields = manualForm.querySelectorAll('input, select');
+  for (const field of fields) field.disabled = true;
+  status.textContent = dayLabel('Зберігаю…', 'שומרת…');
+  let saved = false;
+  try {
+    const result = await admin('create_booking', {...details, token: manualPending.token});
+    saved = true;
+    status.textContent = dayLabel('Запис збережено.', 'התור נשמר.');
+    const link = node('a', dayLabel('Посилання для клієнта', 'קישור ללקוח'));
+    link.href = '/#booking=' + result.client_token;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    $('manualLink').append(link);
+    try { await loadCalendar(); }
+    catch { status.textContent = dayLabel('Запис збережено. Оновіть календар.', 'התור נשמר. יש לרענן את היומן.'); }
+  } catch (error) {
+    const errors = {
+      BOOKING_OVERLAP: ['Цей час уже зайнятий в одному із салонів.', 'השעה תפוסה באחד הסניפים.'],
+      DURING_BREAK: ['Запис перетинається з перервою.', 'התור חופף להפסקה.'],
+      INVALID_BOOKING_DATA: ['Перевірте ім’я, телефон і час.', 'בדקי את השם, הטלפון והשעה.'],
+      INVALID_BOOKING_TIME: ['Оберіть дійсний майбутній час.', 'בחרי שעה עתידית תקינה.'],
+      SERVICE_NOT_FOUND: ['Процедура недоступна в цьому салоні.', 'הטיפול לא זמין בסניף הזה.'],
+    };
+    const unavailable = ['SLOT_UNAVAILABLE', 'SALON_CLOSED', 'OUTSIDE_OVERRIDE'];
+    const pair = errors[error.message] || (unavailable.includes(error.message)
+      ? ['На цей час запис недоступний. Оберіть іншу годину.', 'השעה אינה זמינה להזמנה. בחרי שעה אחרת.']
+      : ['Не вдалося зберегти запис. Спробуйте ще раз.', 'לא ניתן לשמור את התור. נסי שוב.']);
+    status.textContent = dayLabel(...pair);
+  } finally {
+    manualSaving = false;
+    $('manualClose').disabled = false;
+    if (!saved) {
+      $('manualSubmit').disabled = false;
+      for (const field of fields) field.disabled = false;
+    }
+  }
+});
+
 function createDayView(){
   let panel=$('vitaliaDayView');
   if(panel)return panel;
@@ -159,6 +260,12 @@ async function renderDaySchedule(){
       const holiday=(calendarData.holidays||[]).find(h=>h.holiday_date===day);
       const override=(data.overrides||[]).find(o=>o.override_date===day);
       const closed=override?.is_closed===true||(holiday&&override?.is_closed!==false);
+      if (day >= localDay(new Date().toISOString()) && !closed && (data.services || []).length) {
+        const add = node('button', dayLabel('Додати запис', 'הוספת תור'));
+        add.type = 'button';
+        add.onclick = () => openManualBooking(day, id, data.services);
+        area.append(add);
+      }
       const events=[];
       for(const b of bookings){const from=dayMins(dayClock(b.starts_at)),to=dayMins(dayClock(b.treatment_ends_at||b.ends_at));
         events.push({from,to:Math.max(to,from+1),kind:'booking',booking:b});}
