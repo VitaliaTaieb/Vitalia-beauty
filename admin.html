@@ -239,7 +239,40 @@ function dayRow(from,to,kind,title,detail,booking){
   row.append(clock,text);
   if(booking){const cancel=node('button',dayLabel('Скасувати','ביטול'),'danger');cancel.type='button';
     cancel.onclick=()=>{if(!confirm(dayLabel('Скасувати цей запис?','לבטל את התור?')))return;
-      action(async()=>{await admin('cancel_booking',{id:booking.id});await load();});};row.append(cancel);}
+      action(async()=>{await admin('cancel_booking',{id:booking.id});await load();});};row.append(cancel);
+    const linkButton = node('button', dayLabel('Нове посилання для клієнта', 'קישור חדש ללקוח'), 'secondary');
+    linkButton.type = 'button';
+    const linkResult = node('div', '', 'muted');
+    linkResult.setAttribute('role', 'status');
+    linkButton.onclick = async () => {
+      if (!confirm(dayLabel(
+        'Створити нове посилання для цього запису? Попереднє посилання й код перестануть діяти.',
+        'ליצור קישור חדש לתור הזה? הקישור והקוד הקודמים יפסיקו לעבוד.'))) return;
+      linkButton.disabled = true;
+      linkResult.textContent = dayLabel('Створюю посилання…', 'יוצרת קישור…');
+      try {
+        const {client_token} = await admin('renew_booking_link', {id: Number(booking.id), salon_id: Number(booking.salon_id)});
+        if (!/^[a-f0-9]{64}$/.test(client_token)) throw Error('INVALID_LINK');
+        const url = new URL('/#booking=' + client_token, location.origin).href;
+        const field = document.createElement('input');
+        field.readOnly = true;
+        field.dir = 'ltr';
+        field.value = url;
+        field.setAttribute('aria-label', dayLabel('Персональне посилання', 'קישור אישי'));
+        const copy = node('button', dayLabel('Копіювати посилання', 'העתקת קישור'), 'secondary');
+        copy.type = 'button';
+        const status = node('span','');
+        copy.onclick = async () => {
+          try { await navigator.clipboard.writeText(url); status.textContent = dayLabel(' Скопійовано.', ' הועתק.'); }
+          catch { field.focus(); field.select(); }
+        };
+        linkResult.replaceChildren(field, copy, status);
+      } catch {
+        linkResult.textContent = dayLabel('Не вдалося отримати посилання. Спробуйте ще раз.', 'לא ניתן לקבל קישור. נסי שוב.');
+      } finally { linkButton.disabled = false; }
+    };
+    row.append(linkButton, linkResult);
+  }
   return row;
 }
 async function renderDaySchedule(){
