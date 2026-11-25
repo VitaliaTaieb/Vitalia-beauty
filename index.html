@@ -18,7 +18,17 @@
 <main>
 <section class="card"><h2>Vitalia Beauty — כפר יונה</h2><p id="address1">נחל דלתון 34</p><button type="button" onclick="openBooking(1)">לקביעת תור</button></section>
 <section class="card"><h2>Vitalia Taieb — נתניה</h2><p id="address2">אמנון ותמר 6</p><button type="button" onclick="openBooking(2)">לקביעת תור</button></section>
-<section class="card"><h2>התורים שלי</h2><p>לצפייה בתור השתמשי בקישור האישי שקיבלת באישור ההזמנה, או בקוד האישי ששמרת.</p><form id="lookupForm"><label for="lookupToken">קוד אישי</label><input id="lookupToken" dir="ltr" required pattern="[a-f0-9]{64}" style="width:100%;padding:12px"><button type="submit">הצגת התור</button></form><div id="myBookings" role="status"></div></section><p><a href="admin.html" style="color:var(--gold)">כניסת מנהלת</a></p></main>
+<section class="card"><h2>התורים שלי</h2><div id="phoneBookings">
+<form id="phoneSignIn"><label for="myPhone">מספר הטלפון ששימש לקביעת התורים</label>
+<input id="myPhone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="25" required>
+<div id="phoneCaptcha"></div><button id="sendPhoneCode" type="submit" disabled>שליחת קוד ב-SMS</button></form>
+<form id="phoneVerify" hidden><label for="phoneCode">הקוד שקיבלת ב-SMS</label>
+<input id="phoneCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10" required>
+<button type="submit">הצגת התורים שלי</button>
+<button id="phoneBack" class="outline" type="button">שינוי מספר או שליחה מחדש</button></form>
+<div id="phoneResults"></div><p id="phoneStatus" role="status" aria-live="polite"></p>
+<button id="phoneLogout" class="outline" hidden type="button">יציאה</button>
+</div><details><summary>פתיחת תור עם קישור או קוד אישי</summary><p>לצפייה בתור השתמשי בקישור האישי שקיבלת באישור ההזמנה, או בקוד האישי ששמרת.</p><form id="lookupForm"><label for="lookupToken">קוד אישי</label><input id="lookupToken" dir="ltr" required pattern="[a-f0-9]{64}" style="width:100%;padding:12px"><button type="submit">הצגת התור</button></form><div id="myBookings" role="status"></div></details></section><p><a href="admin.html" style="color:var(--gold)">כניסת מנהלת</a></p></main>
 <dialog id="booking" aria-labelledby="bookingHeading" dir="rtl">
 <div class="booking-brand" aria-hidden="true">VT</div>
 <h2 id="bookingHeading">קביעת תור</h2><p id="salonName"></p>
@@ -194,8 +204,170 @@ function savedTokens(){try{return JSON.parse(localStorage.getItem('vitalia_my_bo
 function saveBooking(result){if(!result.client_token)return;const tokens=[...new Set([...savedTokens(),result.client_token])];try{localStorage.setItem('vitalia_my_bookings',JSON.stringify(tokens.slice(-30)));}catch{}showBooking(result.client_token);}
 async function showBooking(token){const root=document.getElementById('myBookings');root.replaceChildren();try{const d=await publicAction({action:'my_booking',token}),card=document.createElement('p');card.textContent=d.salon.name+' · '+d.salon.address+' · '+d.service.name+' · '+new Date(d.booking.starts_at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})+' · '+(d.booking.status==='cancelled'?'בוטל':'מאושר');const a=document.createElement('a');a.href=location.origin+location.pathname+'#booking='+token;a.textContent='קישור אישי לתור — שמרי אותו';a.style.color='var(--gold)';const code=document.createElement('p');code.textContent='קוד אישי: '+token;code.style.overflowWrap='anywhere';root.append(card,a,code);}catch{root.textContent='לא ניתן למצוא את התור. בדקי את הקוד האישי ונסי שוב.';}}
 document.getElementById('lookupForm').onsubmit=e=>{e.preventDefault();showBooking(document.getElementById('lookupToken').value.trim());};
-const linked=/^#booking=([a-f0-9]{64})$/.exec(location.hash);if(linked)showBooking(linked[1]);else{const tokens=savedTokens();if(tokens.length){const select=document.createElement('select');for(const [i,token]of tokens.entries())select.add(new Option('הזמנה '+(i+1),token));select.onchange=()=>showBooking(select.value);document.getElementById('lookupForm').before(select);showBooking(tokens.at(-1));select.value=tokens.at(-1);}}
+const linked=/^#booking=([a-f0-9]{64})$/.exec(location.hash);if(linked){document.getElementById('lookupForm').closest('details').open=true;showBooking(linked[1]);}else{const tokens=savedTokens();if(tokens.length){const select=document.createElement('select');for(const [i,token]of tokens.entries())select.add(new Option('הזמנה '+(i+1),token));select.onchange=()=>showBooking(select.value);document.getElementById('lookupForm').before(select);showBooking(tokens.at(-1));select.value=tokens.at(-1);}}
 readPublic('salons',{select:'id,address'}).then(rows=>{for(const r of rows){const el=document.getElementById('address'+r.id);if(el)el.textContent=r.address;}}).catch(()=>{});
+
+
+const phoneSessionKey = 'vitalia_client_phone_session';
+const phoneControl = id => document.getElementById(id);
+const phoneSignIn = phoneControl('phoneSignIn'), phoneVerify = phoneControl('phoneVerify');
+const phoneLogout = phoneControl('phoneLogout'), phoneStatus = phoneControl('phoneStatus');
+const phoneResults = phoneControl('phoneResults'), sendPhoneCode = phoneControl('sendPhoneCode');
+let destination, phoneChallenge, phoneWidget, phoneBusy = false;
+let phoneSession;
+try { phoneSession = JSON.parse(localStorage.getItem(phoneSessionKey)); } catch {}
+
+function normalizeClientPhone(value) {
+  const n = value.trim().replace(/[\s().-]/g, '');
+  if (/^0(?:[23489]\d{7}|[57]\d{8})$/.test(n)) return '+972' + n.slice(1);
+  if (/^(?:\+|00)?9720?(?:[23489]\d{7}|[57]\d{8})$/.test(n)) return '+972' + n.replace(/^(?:\+|00)?9720?/, '');
+  if (/^(?:\+|00)[1-9]\d{7,14}$/.test(n) && !/^(?:\+|00)972/.test(n)) return n.replace(/^00/, '+');
+  return null;
+}
+
+async function phoneRequest(path, payload, token) {
+  const headers = {apikey: SUPABASE_KEY, 'Content-Type': 'application/json'};
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const result = await fetch(SUPABASE_URL + path, {
+    method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store',
+  });
+  const data = await result.json().catch(() => ({}));
+  if (!result.ok) throw Object.assign(new Error(data.error_code || data.code || ''), {status: result.status});
+  return data;
+}
+
+function savePhoneSession(data) {
+  if (!data?.access_token || !data.refresh_token) throw Error('session_missing');
+  phoneSession = {access_token: data.access_token, refresh_token: data.refresh_token,
+    expires_at: Date.now() + Number(data.expires_in || 3600) * 1000};
+  try { localStorage.setItem(phoneSessionKey, JSON.stringify(phoneSession)); } catch {}
+}
+
+function clearPhoneSession() {
+  phoneSession = null;
+  try { localStorage.removeItem(phoneSessionKey); } catch {}
+  phoneResults.replaceChildren();
+  phoneLogout.hidden = true;
+  phoneSignIn.hidden = false;
+}
+
+function renderPhoneChallenge() {
+  if (!window.turnstile || phoneWidget !== undefined || phoneSignIn.hidden) return;
+  phoneWidget = turnstile.render('#phoneCaptcha', {
+    sitekey: TURNSTILE_SITE_KEY, theme: 'dark', language: 'he',
+    callback: token => { phoneChallenge = token; sendPhoneCode.disabled = phoneBusy; },
+    'expired-callback': () => { phoneChallenge = null; sendPhoneCode.disabled = true; },
+    'error-callback': () => { phoneChallenge = null; sendPhoneCode.disabled = true; },
+  });
+}
+if (window.turnstile) renderPhoneChallenge();
+else document.querySelector('script[src*="turnstile"]').addEventListener('load', renderPhoneChallenge);
+
+async function refreshPhoneSession() {
+  const update = async () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(phoneSessionKey));
+      if (stored?.expires_at > Date.now() + 60000) { phoneSession = stored; return; }
+    } catch {}
+    if (phoneSession?.expires_at > Date.now() + 60000) return;
+    if (!phoneSession) throw Object.assign(Error('signed_out'), {status: 401});
+    savePhoneSession(await phoneRequest('/auth/v1/token?grant_type=refresh_token', {refresh_token: phoneSession.refresh_token}));
+  };
+  return navigator.locks ? navigator.locks.request(phoneSessionKey, update) : update();
+}
+
+async function showPhoneBookings() {
+  phoneSignIn.hidden = phoneVerify.hidden = true;
+  phoneLogout.hidden = false;
+  phoneLogout.disabled = true;
+  phoneStatus.textContent = 'טוענת את התורים שלך…';
+  try {
+    await refreshPhoneSession();
+    const token = phoneSession.access_token;
+    const bookings = await phoneRequest('/rest/v1/rpc/vitalia_my_phone_bookings', {}, token);
+    if (phoneSession?.access_token !== token) return;
+    const dateFormat = new Intl.DateTimeFormat('he-IL', {dateStyle:'full', timeStyle:'short', timeZone:'Asia/Jerusalem'});
+    const cards = bookings.map(booking => {
+      const card = document.createElement('p');
+      card.textContent = [dateFormat.format(new Date(booking.starts_at)), booking.service_name,
+        booking.salon_name, booking.salon_address, booking.status === 'cancelled' ? 'התור בוטל' : ''].filter(Boolean).join(' · ');
+      return card;
+    });
+    phoneResults.replaceChildren(...cards);
+    phoneStatus.textContent = bookings.length ? '' : 'לא נמצאו תורים למספר הטלפון הזה.';
+  } catch (error) {
+    if ([400,401,403].includes(error.status)) { clearPhoneSession(); renderPhoneChallenge(); }
+    phoneStatus.textContent = 'לא ניתן להציג את התורים כרגע. נסי שוב.';
+  } finally { phoneLogout.disabled = false; }
+}
+
+phoneSignIn.onsubmit = async event => {
+  event.preventDefault();
+  if (phoneBusy || !phoneChallenge) return;
+  const phone = normalizeClientPhone(phoneControl('myPhone').value);
+  if (!phone) { phoneStatus.textContent = 'הזיני מספר טלפון תקין.'; return; }
+  phoneBusy = true;
+  sendPhoneCode.disabled = true;
+  phoneStatus.textContent = '';
+  try {
+    await phoneRequest('/auth/v1/otp', {phone, channel:'sms', create_user:true,
+      gotrue_meta_security:{captcha_token:phoneChallenge}});
+    destination = phone;
+    phoneSignIn.hidden = true;
+    phoneVerify.hidden = false;
+    phoneStatus.textContent = 'הקוד נשלח ב-SMS.';
+    phoneControl('phoneCode').focus();
+  } catch (error) {
+    phoneStatus.textContent = error.status === 429 ? 'המתיני מעט לפני בקשת קוד נוסף.' : 'לא ניתן לשלוח קוד כרגע. נסי שוב.';
+  } finally {
+    phoneBusy = false;
+    phoneChallenge = null;
+    if (phoneWidget !== undefined) turnstile.reset(phoneWidget);
+  }
+};
+
+phoneVerify.onsubmit = async event => {
+  event.preventDefault();
+  if (phoneBusy || !destination) return;
+  phoneBusy = true;
+  const buttons = phoneVerify.querySelectorAll('button');
+  buttons.forEach(button => { button.disabled = true; });
+  try {
+    savePhoneSession(await phoneRequest('/auth/v1/verify', {phone:destination, token:phoneControl('phoneCode').value.trim(), type:'sms'}));
+    destination = null;
+    phoneVerify.reset();
+    await showPhoneBookings();
+  } catch {
+    phoneStatus.textContent = 'בדקי את הקוד או בקשי קוד חדש.';
+  } finally {
+    phoneBusy = false;
+    buttons.forEach(button => { button.disabled = false; });
+  }
+};
+
+phoneControl('phoneBack').onclick = () => {
+  destination = null;
+  phoneVerify.reset();
+  phoneVerify.hidden = true;
+  phoneSignIn.hidden = false;
+  phoneStatus.textContent = '';
+  renderPhoneChallenge();
+  phoneControl('myPhone').focus();
+};
+
+phoneLogout.onclick = async () => {
+  const token = phoneSession?.access_token;
+  clearPhoneSession();
+  phoneStatus.textContent = '';
+  renderPhoneChallenge();
+  if (token) await phoneRequest('/auth/v1/logout?scope=local', {}, token).catch(() => {});
+};
+
+window.addEventListener('storage', event => {
+  if (event.key === phoneSessionKey && !event.newValue) { clearPhoneSession(); renderPhoneChallenge(); }
+});
+
+if (phoneSession) showPhoneBookings();
 
 </script>
 </body>
