@@ -196,6 +196,17 @@ Deno.serve(async (req) => {
       if(!updated)return reply({error:'BOOKING_NOT_FOUND'},404,origin);
       return reply({saved:true,id:updated.id,starts_at:start.toISOString()},200,origin);
     }
+    if (input.action === 'renew_booking_link') {
+      if (!Number.isSafeInteger(input.id) || input.id < 1) return reply({error: 'INVALID_ID'}, 400, origin);
+      const toHex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+      const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
+      const hash = toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))));
+      const {data, error} = await db.from('appointments').update({client_token_hash: hash})
+        .eq('id', input.id).eq('salon_id', salon).eq('status', 'confirmed').select('id').maybeSingle();
+      if (error) throw error;
+      if (!data) return reply({error: 'BOOKING_NOT_FOUND'}, 404, origin);
+      return reply({client_token: token}, 200, origin);
+    }
     if(input.action==='cancel_booking'){
       if(!Number.isSafeInteger(input.id)||input.id<1)return reply({error:'INVALID_ID'},400,origin);
       const {data,error}=await db.from('appointments').update({status:'cancelled'}).eq('id',input.id).select('id').maybeSingle();
