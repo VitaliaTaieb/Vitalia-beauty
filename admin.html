@@ -81,8 +81,20 @@ function renderSlots(data){let root=$('slots');root.replaceChildren();let slots=
 function renderBookings(data){let root=$('bookings');root.replaceChildren();if(!data.bookings?.length){root.append(node('p',t('empty')));return;}for(const a of data.bookings){const line=node('div','','item');const details=node('div','');const starts=new Date(a.starts_at);const ends=new Date(a.treatment_ends_at||a.ends_at);details.append(node('b',starts.toLocaleDateString(lang==='he'?'he-IL':'uk-UA',{timeZone:'Asia/Jerusalem'})+' · '+starts.toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit'})+'–'+ends.toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit'})));details.append(node('div',a.client_name+' · '+a.client_phone));details.append(node('div',(a.salon_id===2?'Vitalia Taieb':'Vitalia Beauty')+' · '+(a.service_name||'')+' · '+(a.status==='cancelled'?(lang==='he'?'בוטל':'Скасовано'):(lang==='he'?'מאושר':'Підтверджено')),'small muted'));if(a.status==='confirmed'){const cancel=node('button',lang==='he'?'ביטול תור':'Скасувати запис','danger');cancel.onclick=()=>{if(confirm(lang==='he'?'לבטל את התור?':'Скасувати цей запис?'))action(async()=>{await admin('cancel_booking',{id:a.id});await load();});};line.append(cancel);}line.append(details);root.append(line);}}
 function renderClosures(data){let root=$('closures');root.replaceChildren();const rows=(data.overrides||[]).filter(x=>x.is_closed);if(!rows.length){root.append(node('p',t('empty')));return;}for(const r of rows)root.append(node('div',r.override_date,'item'));}
 function renderBreaks(data){const root=$('breaks');root.replaceChildren();const rows=data.breaks||[];if(!rows.length){root.append(node('p',t('empty')));return;}for(const b of rows){const line=node('div','','item');const info=node('div',b.work_date+' · '+time(b.start_time)+'–'+time(b.end_time));const btn=node('button',t('remove'),'danger');btn.type='button';btn.onclick=async()=>{if(!confirm(t('confirmDelete')))return;await action(async()=>{await admin('delete_break',{id:b.id});await load();});};line.append(info,btn);root.append(line);}}
-function renderServiceBreaks(data){const select=$('bufferService'),wasSelected=select.value;select.replaceChildren();const rows=data.services||[];for(const s of rows)select.add(new Option(s.name+' · '+s.break_after_minutes+' '+(lang==='he'?'דק׳':'хв'),String(s.id)));if(rows.some(s=>String(s.id)===wasSelected))select.value=wasSelected;const current=rows.find(s=>String(s.id)===select.value);$('bufferMinutes').value=current?String(current.break_after_minutes):'0';select.onchange=()=>{$('bufferMinutes').value=String((rows.find(s=>String(s.id)===select.value)||{}).break_after_minutes??0)};}
-function renderServiceEditor(data){const select=$('editService'),prior=select.value,priorSalon=select.dataset.salon;select.replaceChildren(new Option(t('newService'),''));const rows=data.services||[];for(const s of rows)select.add(new Option(s.name+' · ₪'+s.price,String(s.id)));select.dataset.salon=String(salon);if(priorSalon===String(salon)&&rows.some(s=>String(s.id)===prior))select.value=prior;select.onchange=()=>{const s=rows.find(x=>String(x.id)===select.value);$('serviceName').value=s?.name||'';$('servicePrice').value=s?String(s.price):'';$('serviceDuration').value=s?String(s.duration_minutes):'';$('servicePause').value=String(s?.break_after_minutes||0);};select.onchange();}
+function selectableServices(data, salonId){
+  const services=data.services||[];
+  if(Number(salonId)!==1)return services;
+  const seen=new Set();
+  return services.filter(service=>{
+    if(service.import_only||Number(service.duration_minutes)<=0)return false;
+    const key=JSON.stringify([service.name,Number(service.price),Number(service.duration_minutes),Number(service.break_after_minutes||0)]);
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+function renderServiceBreaks(data){const select=$('bufferService'),wasSelected=select.value;select.replaceChildren();const rows=selectableServices(data,salon);for(const s of rows)select.add(new Option(s.name+' · '+s.break_after_minutes+' '+(lang==='he'?'דק׳':'хв'),String(s.id)));if(rows.some(s=>String(s.id)===wasSelected))select.value=wasSelected;const current=rows.find(s=>String(s.id)===select.value);$('bufferMinutes').value=current?String(current.break_after_minutes):'0';select.onchange=()=>{$('bufferMinutes').value=String((rows.find(s=>String(s.id)===select.value)||{}).break_after_minutes??0)};}
+function renderServiceEditor(data){const select=$('editService'),prior=select.value,priorSalon=select.dataset.salon;select.replaceChildren(new Option(t('newService'),''));const rows=selectableServices(data,salon);for(const s of rows)select.add(new Option(s.name+' · ₪'+s.price,String(s.id)));select.dataset.salon=String(salon);if(priorSalon===String(salon)&&rows.some(s=>String(s.id)===prior))select.value=prior;select.onchange=()=>{const s=rows.find(x=>String(x.id)===select.value);$('serviceName').value=s?.name||'';$('servicePrice').value=s?String(s.price):'';$('serviceDuration').value=s?String(s.duration_minutes):'';$('servicePause').value=String(s?.break_after_minutes||0);};select.onchange();}
 $('serviceForm').addEventListener('submit',e=>{e.preventDefault();if(!confirm(t('confirmService')))return;action(async()=>{const d=await admin('save_service',{id:$('editService').value?Number($('editService').value):null,name:$('serviceName').value.trim(),price:Number($('servicePrice').value),duration_minutes:Number($('serviceDuration').value),break_after_minutes:Number($('servicePause').value)});await load();$('editService').value=String(d.id);$('editService').onchange();});});
 async function load(){let data=await admin('list');await loadCalendar();$('whatsappState').textContent=lang==='he'?'תזכורות WhatsApp: נדרש חיבור ספק והפעלת השליחה.':'WhatsApp-нагадування: потрібні підключення провайдера й активація відправлення.';renderSlots(data);renderServiceEditor(data);renderBreaks(data);renderServiceBreaks(data);drawCalendar();renderClosures(data);}
 async function action(cb){try{busy(true);await cb();msg(t('created'));}catch(err){msg(err.message||t('unavailable'),true);}finally{busy(false);}}
@@ -293,10 +305,11 @@ async function renderDaySchedule(){
       const holiday=(calendarData.holidays||[]).find(h=>h.holiday_date===day);
       const override=(data.overrides||[]).find(o=>o.override_date===day);
       const closed=override?.is_closed===true||(holiday&&override?.is_closed!==false);
-      if (day >= localDay(new Date().toISOString()) && !closed && (data.services || []).length) {
+      const services=selectableServices(data,id);
+      if (day >= localDay(new Date().toISOString()) && !closed && services.length) {
         const add = node('button', dayLabel('Додати запис', 'הוספת תור'));
         add.type = 'button';
-        add.onclick = () => openManualBooking(day, id, data.services);
+        add.onclick = () => openManualBooking(day, id, services);
         area.append(add);
       }
       const events=[];
