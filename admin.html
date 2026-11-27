@@ -25,6 +25,15 @@
 .day-timeline-booking-service{font-weight:400;color:#edd8ce}
 .day-timeline-dialog{width:min(92vw,530px);max-height:90vh;overflow:auto;background:#181818;color:#f5eddd;border:1px solid #79673f;border-radius:14px;padding:16px}
 .day-timeline-dialog::backdrop{background:#000a}
+.day-controls{display:grid;gap:8px;margin:12px 0}
+.day-controls h3,.day-controls p{margin:0}
+.day-controls .actions{justify-content:start}
+.day-controls .actions>*{flex:0 1 auto}
+.day-controls .actions button{padding:7px 11px}
+.day-management .grid{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+.day-management form{margin-block:12px 18px}
+.day-management .item button{min-height:36px;padding:5px 10px}
+details>summary{cursor:pointer;color:var(--gold);font-weight:700}
 </style>
 </head>
 <body>
@@ -32,18 +41,12 @@
 <main>
 <section id="authCard" class="card"><h1 data-t="admin">Адміністративний кабінет</h1><p class="muted" data-t="loginHelp">Увійдіть або створіть власний обліковий запис адміністратора. Новий обліковий запис потребує підтвердження прав доступу.</p><form id="authForm"><div class="grid"><div><label for="email">Email</label><input id="email" type="email" autocomplete="email" required></div><div><label for="password" data-t="password">Пароль</label><input id="password" type="password" minlength="8" autocomplete="current-password" required></div></div><div class="actions" style="margin-top:12px"><button id="loginBtn" type="submit" data-t="login">Увійти</button><button id="signupBtn" type="button" class="secondary" data-t="createAccount">Створити обліковий запис</button></div></form><p id="authMsg" class="muted" role="status"></p></section>
 <section id="dashboard" class="hidden">
+<div id="status" role="status" aria-live="polite" class="status hidden"></div>
 <div class="actions"><div><h1 data-t="schedule">Керування графіком</h1><p class="muted" data-t="flexible">Відкривайте будь-які дати для кожного салону. Запис у двох салонах не повинен перетинатися.</p></div><button id="refresh" class="secondary" data-t="refresh">Оновити</button></div>
+<section class="card" id="calendarCard"><div class="grid"><div><label id="calendarLabel" for="calendarMonth" data-t="calendarTitle">Календар</label><input id="calendarMonth" type="month"></div><div><label for="calendarFilter" data-t="salonLabel">Салон</label><select id="calendarFilter"><option value="0" data-t="bothSalons">Обидва салони</option><option value="1">Vitalia Beauty</option><option value="2">Vitalia Taieb</option></select></div></div><div id="adminCalendar" class="month-grid"></div></section>
+<details class="card"><summary data-t="serviceSettings">Керування послугами</summary>
 <div class="card"><div class="tabs"><button type="button" id="salon1" class="tabselected">Vitalia Beauty · כפר יונה</button><button type="button" id="salon2" class="secondary">Vitalia Taieb · נתניה</button></div></div>
-<div class="twocol"><section class="card"><h2 data-t="openHours">Відкрити години для запису</h2><form id="addForm"><div class="grid"><div><label for="workDate" data-t="date">Дата</label><input id="workDate" type="date" required></div><div><label for="fromTime" data-t="from">Початок</label><input id="fromTime" type="time" value="10:00" required></div><div><label for="toTime" data-t="to">Кінець</label><input id="toTime" type="time" value="18:00" required></div></div><div class="actions" style="margin-top:12px"><button type="submit" data-t="open">Відкрити дату</button><button type="button" id="closeDate" class="danger" data-t="close">Закрити дату</button><button type="button" id="reopenDate" class="secondary" data-t="reopen">Скасувати закриття</button></div></form><p class="muted" data-t="noRecurring">Графік не прив'язаний до днів тижня: ви обираєте конкретні дати.</p></section>
-<section class="card"><h2 data-t="datesOpen">Відкриті дати та години</h2><div id="slots" class="muted" data-t="loading">Завантаження…</div></section></div>
 <div class="twocol">
-<section class="card"><h2 data-t="dailyBreak">Перерва в робочому дні</h2>
-<form id="breakForm"><div class="grid"><div><label for="breakDate" data-t="date">Дата</label><input id="breakDate" type="date" required></div>
-<div><label for="breakFrom" data-t="from">Початок</label><input id="breakFrom" type="time" value="13:00" required></div>
-<div><label for="breakTo" data-t="to">Кінець</label><input id="breakTo" type="time" value="14:00" required></div></div>
-<div class="actions" style="margin-top:12px"><button type="submit" data-t="saveBreak">Додати перерву</button></div></form>
-<p class="muted" data-t="breakExplainer">Клієнти не зможуть обрати час, який перетинається з перервою.</p>
-<div id="breaks" class="muted"></div></section>
 <section class="card"><h2 data-t="serviceBreak">Пауза після процедури</h2>
 <form id="serviceBreakForm"><div class="grid">
 <div><label for="bufferService" data-t="procedure">Процедура</label><select id="bufferService" required></select></div>
@@ -52,9 +55,9 @@
 <p class="muted" data-t="pauseExplainer">Час після процедури резервується до наступного запису.</p></section></div>
 <section class="card"><h2 data-t="serviceEditor">Прайс обраного салону</h2><p class="muted" data-t="serviceHint">Назви для клієнтів — івритом. Зміни застосовуються до нових записів; час наявних записів зберігається.</p>
 <form id="serviceForm"><div class="grid"><div><label for="editService" data-t="procedure">Процедура</label><select id="editService"></select></div><div><label for="serviceName" data-t="serviceName">Назва івритом</label><input id="serviceName" dir="rtl" maxlength="200" required></div><div><label for="servicePrice" data-t="servicePrice">Ціна (₪)</label><input id="servicePrice" type="number" min="0" max="100000" step="0.01" required></div><div><label for="serviceDuration" data-t="serviceDuration">Тривалість (хвилин)</label><input id="serviceDuration" type="number" min="5" max="720" step="1" required></div><div><label for="servicePause" data-t="pauseMinutes">Пауза (хвилин)</label><input id="servicePause" type="number" min="0" max="1440" step="1" value="0" required></div></div><div class="actions" style="margin-top:12px"><button type="submit" data-t="saveService">Зберегти процедуру</button></div></form></section>
-<section class="card"><div class="grid"><div><label id="calendarLabel" for="calendarMonth">Календар / יומן</label><input id="calendarMonth" type="month"></div><div><label for="calendarFilter">Салон / סניף</label><select id="calendarFilter"><option value="0">Обидва / שני הסניפים</option><option value="1">Vitalia Beauty</option><option value="2">Vitalia Taieb</option></select></div></div><div id="adminCalendar" class="month-grid"></div><p id="calendarDay"></p><h2 data-t="bookings">Записи клієнтів</h2><p class="muted" data-t="bookingsHelp">Тут відображаються бронювання обраного салону.</p><div id="bookings" class="muted" data-t="loading">Завантаження…</div></section>
-<section class="card"><p id="holidayHelp">Основні єврейські свята закриті автоматично. «Скасувати закриття» дозволяє запис у свято, якщо відкриті робочі години.</p><p id="whatsappState"></p><h2 data-t="closures">Закриті дати</h2><div id="closures" class="muted"></div></section></section>
-<div id="status" role="status" aria-live="polite" class="status hidden"></div>
+
+<p id="whatsappState" class="muted"></p></details></section>
+
 </main>
 <dialog id="manualBooking" aria-labelledby="manualTitle" style="width:min(92vw,530px);max-height:90vh;overflow:auto;background:#181818;color:#f5eddd;border:1px solid #79673f;border-radius:14px;padding:20px">
 <h2 id="manualTitle"></h2><p id="manualContext"></p>
@@ -77,12 +80,19 @@ const $=id=>document.getElementById(id);
 const dict={uk:{admin:'Адміністративний кабінет',loginHelp:'Увійдіть або створіть власний обліковий запис адміністратора. Новий обліковий запис потребує підтвердження прав доступу.',password:'Пароль',login:'Увійти',createAccount:'Створити обліковий запис',logout:'Вийти',schedule:'Керування графіком',flexible:'Відкривайте будь-які дати для кожного салону. Запис у двох салонах не повинен перетинатися.',refresh:'Оновити',openHours:'Відкрити години для запису',date:'Дата',from:'Початок',to:'Кінець',open:'Відкрити дату',close:'Закрити дату',reopen:'Скасувати закриття',noRecurring:'Графік не прив’язаний до днів тижня: ви обираєте конкретні дати.',datesOpen:'Відкриті дати та години',bookings:'Записи клієнтів',bookingsHelp:'Тут відображаються бронювання обраного салону.',loading:'Завантаження…',closures:'Закриті дати',empty:'Немає записів',remove:'Прибрати',created:'Готово, збережено.',confirmDelete:'Прибрати ці години?',confirmClose:'Закрити обрану дату для клієнтів?',signupDone:'Обліковий запис створено. Перевірте електронну пошту, якщо потрібно підтвердження. Для доступу власника необхідне окреме схвалення.',notAuthorized:'Вхід виконано, але права адміністратора ще не налаштовані. Повідомте про це в чаті, пароль нікому не надсилайте.',loginFail:'Помилка входу',pickDate:'Оберіть дату',busy:'Виконується…',unavailable:'Не вдалося отримати дані',expired:'Сеанс завершився. Увійдіть повторно.',dailyBreak:'Перерва в робочому дні',saveBreak:'Додати перерву',breakExplainer:'Клієнти не зможуть обрати час, який перетинається з перервою.',serviceBreak:'Пауза після процедури',procedure:'Процедура',pauseMinutes:'Пауза (хвилин)',savePause:'Зберегти паузу',pauseExplainer:'Час після процедури резервується до наступного запису.'},he:{admin:'ניהול VITALIA',loginHelp:'כניסה או יצירת חשבון מנהל. חשבון חדש דורש אישור הרשאות.',password:'סיסמה',login:'כניסה',createAccount:'יצירת חשבון',logout:'יציאה',schedule:'ניהול יומן העבודה',flexible:'פתחי ימים ושעות לפי בחירתך עבור כל סניף, ללא קביעת ימים קבועים.',refresh:'רענון',openHours:'פתיחת שעות להזמנה',date:'תאריך',from:'התחלה',to:'סיום',open:'פתיחת יום',close:'סגירת יום',reopen:'ביטול סגירה',noRecurring:'אין ימי עבודה קבועים. בחרי כל תאריך בנפרד.',datesOpen:'תאריכים ושעות פתוחים',bookings:'תורים',bookingsHelp:'תורים בסניף הנבחר.',loading:'טוען…',closures:'ימים סגורים',empty:'אין רשומות',remove:'מחיקה',created:'נשמר בהצלחה.',confirmDelete:'למחוק שעות אלה?',confirmClose:'לסגור את התאריך לתורים?',signupDone:'החשבון נוצר. בדקי דוא״ל לאישור. נדרש אישור הרשאות מנהל.',notAuthorized:'נכנסת, אך עדיין אין הרשאת מנהל. אין לשלוח סיסמה.',loginFail:'שגיאה בכניסה',pickDate:'בחרי תאריך',busy:'מעבד…',unavailable:'לא ניתן לטעון נתונים',expired:'ההתחברות פגה. התחברי מחדש.',dailyBreak:'הפסקה במהלך יום העבודה',saveBreak:'הוספת הפסקה',breakExplainer:'לא ניתן להזמין טיפול שחופף להפסקה.',serviceBreak:'הפסקה אחרי טיפול',procedure:'טיפול',pauseMinutes:'הפסקה (דקות)',savePause:'שמירת הפסקה',pauseExplainer:'הזמן אחרי כל טיפול יישמר לפני התור הבא.'}};
 Object.assign(dict.uk,{serviceEditor:'Прайс обраного салону',serviceHint:'Назви для клієнтів — івритом. Зміни застосовуються до нових записів; час наявних записів зберігається.',serviceName:'Назва івритом',servicePrice:'Ціна (₪)',serviceDuration:'Тривалість (хвилин)',saveService:'Зберегти процедуру',newService:'＋ Нова процедура',confirmService:'Зберегти зміни прайсу обраного салону?'});
 Object.assign(dict.he,{serviceEditor:'מחירון הסניף הנבחר',serviceHint:'שמות הטיפולים ללקוחות בעברית. השינויים יחולו על הזמנות חדשות; זמני תורים קיימים נשמרים.',serviceName:'שם הטיפול בעברית',servicePrice:'מחיר (₪)',serviceDuration:'משך הטיפול (דקות)',saveService:'שמירת טיפול',newService:'＋ טיפול חדש',confirmService:'לשמור את השינויים במחירון הסניף הנבחר?'});
+Object.assign(dict.uk,{serviceSettings:'Керування послугами',calendarTitle:'Календар',bothSalons:'Обидва салони',salonLabel:'Салон'});
+Object.assign(dict.he,{serviceSettings:'ניהול טיפולים',calendarTitle:'יומן',bothSalons:'שני הסניפים',salonLabel:'סניף'});
 let lang=localStorage.getItem('vitalia_lang')||'uk',salon=1,accessToken=null,refreshToken=null,expiresAt=0,refreshing=null;
 const t=k=>dict[lang][k]||k;
-function translate(){if($('holidayHelp'))$('holidayHelp').textContent=lang==='he'?'חגים מרכזיים סגורים אוטומטית. ביטול סגירה מאפשר תורים בחג בשעות שפתחת.':'Основні єврейські свята закриті автоматично. «Скасувати закриття» дозволяє запис у свято у відкриті години.';document.documentElement.lang=lang;document.documentElement.dir=lang==='he'?'rtl':'ltr';document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));}
+function translate(){document.documentElement.lang=lang;document.documentElement.dir=lang==='he'?'rtl':'ltr';document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));}
 function msg(value,error=false){$('status').textContent=value;$('status').className='status '+(error?'error':'ok');$('status').classList.remove('hidden');}
 function authMsg(value,error=false){$('authMsg').textContent=value;$('authMsg').className=error?'error':'muted';}
-function busy(flag){document.querySelectorAll('button').forEach(b=>b.disabled=flag)}
+function busy(flag){
+  for(const button of document.querySelectorAll('button')){
+    if(flag&&!button.disabled){button.dataset.busy='true';button.disabled=true;}
+    else if(!flag&&button.dataset.busy){delete button.dataset.busy;button.disabled=false;}
+  }
+}
 const jsonHeaders=()=>({'apikey':KEY,'Content-Type':'application/json'});
 async function authRequest(path,data){const res=await fetch(BASE+'/auth/v1/'+path,{method:'POST',headers:jsonHeaders(),body:JSON.stringify(data)});const result=await res.json();if(!res.ok)throw Error(result.msg||result.error_description||result.message||result.error||String(res.status));return result;}
 async function admin(action,more={}){await ensureSession();if(!accessToken)throw Error(t('expired'));const r=await fetch(API,{method:'POST',headers:{...jsonHeaders(),authorization:'Bearer '+accessToken},body:JSON.stringify({action,salon_id:salon,...more})});const data=await r.json().catch(()=>({}));if(!r.ok){if(r.status===401||r.status===403){if(r.status===403)throw Error(t('notAuthorized'));throw Error(t('expired'));}throw Error(data.error||String(r.status));}return data;}
@@ -97,10 +107,6 @@ setInterval(()=>{if(accessToken)ensureSession().catch(e=>msg(e.message,true));},
 window.addEventListener('storage',e=>{if(e.key==='vitalia_admin_session'){if(!e.newValue)clearSession();else{const d=JSON.parse(e.newValue);accessToken=d.access_token;refreshToken=d.refresh_token;expiresAt=d.expires_at;}}});
 function node(tag,text,cls){const el=document.createElement(tag);if(cls)el.className=cls;el.textContent=text;return el;}
 function time(s){return String(s||'').slice(0,5)}
-function renderSlots(data){let root=$('slots');root.replaceChildren();let slots=data.slots||[];if(!slots.length){root.append(node('p',t('empty')));return;}for(const a of slots){const line=node('div','','item');const info=node('div',a.work_date+' · '+time(a.start_time)+'–'+time(a.end_time));const btn=node('button',t('remove'),'danger');btn.type='button';btn.onclick=async()=>{if(!confirm(t('confirmDelete')))return;await action(async()=>{await admin('delete_slot',{id:a.id});await load();});};line.append(info,btn);root.append(line);}}
-function renderBookings(data){let root=$('bookings');root.replaceChildren();if(!data.bookings?.length){root.append(node('p',t('empty')));return;}for(const a of data.bookings){const line=node('div','','item');const details=node('div','');const starts=new Date(a.starts_at);const ends=new Date(a.treatment_ends_at||a.ends_at);details.append(node('b',starts.toLocaleDateString(lang==='he'?'he-IL':'uk-UA',{timeZone:'Asia/Jerusalem'})+' · '+starts.toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit'})+'–'+ends.toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit'})));details.append(node('div',a.client_name+' · '+a.client_phone));details.append(node('div',(a.salon_id===2?'Vitalia Taieb':'Vitalia Beauty')+' · '+(a.service_name||'')+' · '+(a.status==='cancelled'?(lang==='he'?'בוטל':'Скасовано'):(lang==='he'?'מאושר':'Підтверджено')),'small muted'));if(a.status==='confirmed'){const cancel=node('button',lang==='he'?'ביטול תור':'Скасувати запис','danger');cancel.onclick=()=>{if(confirm(lang==='he'?'לבטל את התור?':'Скасувати цей запис?'))action(async()=>{await admin('cancel_booking',{id:a.id});await load();});};line.append(cancel);}line.append(details);root.append(line);}}
-function renderClosures(data){let root=$('closures');root.replaceChildren();const rows=(data.overrides||[]).filter(x=>x.is_closed);if(!rows.length){root.append(node('p',t('empty')));return;}for(const r of rows)root.append(node('div',r.override_date,'item'));}
-function renderBreaks(data){const root=$('breaks');root.replaceChildren();const rows=data.breaks||[];if(!rows.length){root.append(node('p',t('empty')));return;}for(const b of rows){const line=node('div','','item');const info=node('div',b.work_date+' · '+time(b.start_time)+'–'+time(b.end_time));const btn=node('button',t('remove'),'danger');btn.type='button';btn.onclick=async()=>{if(!confirm(t('confirmDelete')))return;await action(async()=>{await admin('delete_break',{id:b.id});await load();});};line.append(info,btn);root.append(line);}}
 function selectableServices(data, salonId){
   const services=data.services||[];
   if(Number(salonId)!==1)return services;
@@ -116,7 +122,13 @@ function selectableServices(data, salonId){
 function renderServiceBreaks(data){const select=$('bufferService'),wasSelected=select.value;select.replaceChildren();const rows=selectableServices(data,salon);for(const s of rows)select.add(new Option(s.name+' · '+s.break_after_minutes+' '+(lang==='he'?'דק׳':'хв'),String(s.id)));if(rows.some(s=>String(s.id)===wasSelected))select.value=wasSelected;const current=rows.find(s=>String(s.id)===select.value);$('bufferMinutes').value=current?String(current.break_after_minutes):'0';select.onchange=()=>{$('bufferMinutes').value=String((rows.find(s=>String(s.id)===select.value)||{}).break_after_minutes??0)};}
 function renderServiceEditor(data){const select=$('editService'),prior=select.value,priorSalon=select.dataset.salon;select.replaceChildren(new Option(t('newService'),''));const rows=selectableServices(data,salon);for(const s of rows)select.add(new Option(s.name+' · ₪'+s.price,String(s.id)));select.dataset.salon=String(salon);if(priorSalon===String(salon)&&rows.some(s=>String(s.id)===prior))select.value=prior;select.onchange=()=>{const s=rows.find(x=>String(x.id)===select.value);$('serviceName').value=s?.name||'';$('servicePrice').value=s?String(s.price):'';$('serviceDuration').value=s?String(s.duration_minutes):'';$('servicePause').value=String(s?.break_after_minutes||0);};select.onchange();}
 $('serviceForm').addEventListener('submit',e=>{e.preventDefault();if(!confirm(t('confirmService')))return;action(async()=>{const d=await admin('save_service',{id:$('editService').value?Number($('editService').value):null,name:$('serviceName').value.trim(),price:Number($('servicePrice').value),duration_minutes:Number($('serviceDuration').value),break_after_minutes:Number($('servicePause').value)});await load();$('editService').value=String(d.id);$('editService').onchange();});});
-async function load(){let data=await admin('list');await loadCalendar();$('whatsappState').textContent=lang==='he'?'תזכורות WhatsApp: נדרש חיבור ספק והפעלת השליחה.':'WhatsApp-нагадування: потрібні підключення провайдера й активація відправлення.';renderSlots(data);renderServiceEditor(data);renderBreaks(data);renderServiceBreaks(data);drawCalendar();renderClosures(data);}
+async function load(){
+  const data=await admin('list');
+  renderServiceEditor(data);
+  renderServiceBreaks(data);
+  $('whatsappState').textContent=lang==='he'?'תזכורות WhatsApp: נדרש חיבור ספק והפעלת השליחה.':'WhatsApp-нагадування: потрібні підключення провайдера й активація відправлення.';
+  await loadCalendar();
+}
 async function action(cb){try{busy(true);await cb();msg(t('created'));}catch(err){msg(err.message||t('unavailable'),true);}finally{busy(false);}}
 async function showDashboard(){await load();$('authCard').classList.add('hidden');$('dashboard').classList.remove('hidden');$('signout').classList.remove('hidden');}
 $('lang').addEventListener('change',e=>{lang=e.target.value;localStorage.setItem('vitalia_lang',lang);translate();if(!$('dashboard').classList.contains('hidden'))load().catch(e=>msg(e.message,true));});
@@ -126,15 +138,7 @@ $('signout').onclick=async()=>{try{await fetch(BASE+'/auth/v1/logout',{method:'P
 $('salon1').onclick=async()=>{salon=1;$('salon1').className='tabselected';$('salon2').className='secondary';await action(load);};
 $('salon2').onclick=async()=>{salon=2;$('salon2').className='tabselected';$('salon1').className='secondary';await action(load);};
 $('refresh').onclick=()=>action(load);
-$('addForm').addEventListener('submit',async e=>{e.preventDefault();await action(async()=>{await admin('add_slot',{date:$('workDate').value,start:$('fromTime').value,end:$('toTime').value});await load();});});
-$('breakForm').addEventListener('submit',async e=>{e.preventDefault();await action(async()=>{await admin('add_break',{date:$('breakDate').value,start:$('breakFrom').value,end:$('breakTo').value});await load();});});
 $('serviceBreakForm').addEventListener('submit',async e=>{e.preventDefault();await action(async()=>{await admin('set_service_break',{service_id:Number($('bufferService').value),minutes:Number($('bufferMinutes').value)});await load();});});
-$('closeDate').onclick=()=>action(async()=>{const date=$('workDate').value;if(!date)throw Error(t('pickDate'));if(!confirm(t('confirmClose')))return;await admin('close_date',{date,closed:true});await load();});
-$('reopenDate').onclick=()=>action(async()=>{const date=$('workDate').value;if(!date)throw Error(t('pickDate'));await admin('close_date',{date,closed:false});await load();});
-$('breakDate').value=$('workDate').value||new Date().toISOString().slice(0,10);
-$('breakDate').min=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
-$('workDate').addEventListener('change',()=>{$('breakDate').value=$('workDate').value;});
-$('workDate').min=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 try{const old=JSON.parse(localStorage.getItem('vitalia_admin_session')||sessionStorage.getItem('vitalia_admin_session')||'null');if(old?.access_token){accessToken=old.access_token;refreshToken=old.refresh_token;expiresAt=old.expires_at||0;showDashboard().catch(e=>authMsg(e.message,true));}}catch{clearSession()}
 
 let calendarData={bookings:[],slots:[],holidays:[]},selectedCalendarDay='';
@@ -142,23 +146,59 @@ function localDay(iso){const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/J
 async function loadCalendar(){
   const month=$('calendarMonth').value;
   const filter=Number($('calendarFilter').value);
-  const data=await admin('calendar',{month,filter:0});
+  const salons=filter?[filter]:[1,2];
+  const [data,...schedules]=await Promise.all([
+    admin('calendar',{month,filter:0}),
+    ...salons.map(salon_id=>admin('list',{salon_id})),
+  ]);
   if(month!==$('calendarMonth').value||filter!==Number($('calendarFilter').value))return;
   calendarData={
     ...data,
     allBookings:data.bookings,
+    salons,
+    schedules:Object.fromEntries(salons.map((id,index)=>[id,schedules[index]])),
     bookings:filter?data.bookings.filter(b=>Number(b.salon_id)===filter):data.bookings,
     slots:filter?data.slots.filter(s=>Number(s.salon_id)===filter):data.slots,
   };
   drawCalendar();
 }
-function drawCalendar(){const root=$('adminCalendar');root.replaceChildren();const [y,m]=$('calendarMonth').value.split('-').map(Number);for(const d of ['א','ב','ג','ד','ה','ו','ש'])root.append(node('strong',d));for(let i=0;i<new Date(y,m-1,1).getDay();i++)root.append(node('span',''));for(let d=1;d<=new Date(y,m,0).getDate();d++){const key=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,items=calendarData.bookings.filter(x=>localDay(x.starts_at)===key),slots=calendarData.slots.filter(x=>x.work_date===key),holiday=calendarData.holidays.find(x=>x.holiday_date===key),b=node('button',String(d),key===selectedCalendarDay?'selected':'');b.type='button';if(holiday){b.classList.add('holiday');b.title=holiday.name_he;}b.append(node('small',items.length?String(items.length)+' '+(lang==='he'?'תורים':'записів'):slots.length?(lang==='he'?'שעות פתוחות':'відкрито'):holiday?holiday.name_he:''));b.onclick=()=>{selectedCalendarDay=key;drawCalendar();};root.append(b);}const rows=calendarData.bookings.filter(x=>!selectedCalendarDay||localDay(x.starts_at)===selectedCalendarDay);$('calendarDay').textContent=selectedCalendarDay||$('calendarMonth').value;renderBookings({bookings:rows});}
-$('calendarMonth').value=localDay(new Date().toISOString()).slice(0,7);$('calendarMonth').onchange=()=>action(loadCalendar);$('calendarFilter').onchange=()=>action(loadCalendar);
+function calendarDayState(day,id){
+  const data=calendarData.schedules?.[id]||{};
+  const holiday=(calendarData.holidays||[]).find(item=>item.holiday_date===day);
+  const override=(data.overrides||[]).find(item=>item.override_date===day);
+  const slots=(calendarData.slots||[]).filter(item=>Number(item.salon_id)===id&&item.work_date===day);
+  const closed=override?.is_closed===true||Boolean(holiday&&override?.is_closed!==false);
+  return {closed,holiday,slots};
+}
+function drawCalendar(){
+  const root=$('adminCalendar');
+  root.replaceChildren();
+  const [year,month]=$('calendarMonth').value.split('-').map(Number);
+  const weekdays=lang==='he'?['א','ב','ג','ד','ה','ו','ש']:['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
+  for(const weekday of weekdays)root.append(node('strong',weekday));
+  for(let i=0;i<new Date(year,month-1,1).getDay();i++)root.append(node('span',''));
+  for(let date=1;date<=new Date(year,month,0).getDate();date++){
+    const key=$('calendarMonth').value+'-'+String(date).padStart(2,'0');
+    const states=(calendarData.salons||[]).map(id=>calendarDayState(key,id));
+    const items=calendarData.bookings.filter(booking=>booking.status==='confirmed'&&localDay(booking.starts_at)===key);
+    const isOpen=states.some(state=>!state.closed&&state.slots.length);
+    const holiday=states.find(state=>state.holiday)?.holiday;
+    const button=node('button',String(date),key===selectedCalendarDay?'selected':'');
+    button.type='button';
+    button.setAttribute('aria-pressed',String(key===selectedCalendarDay));
+    if(holiday){button.classList.add('holiday');button.title=holiday.name_he;}
+    if(items.length)button.append(node('small',String(items.length)+' '+dayLabel('записів','תורים')));
+    if(isOpen)button.append(node('small',dayLabel('Відкрито','פתוח')));
+    else if(states.some(state=>state.closed))button.append(node('small',dayLabel('Закрито','סגור')));
+    button.onclick=()=>{selectedCalendarDay=key;drawCalendar();};
+    root.append(button);
+  }
+}
+$('calendarMonth').value=localDay(new Date().toISOString()).slice(0,7);$('calendarMonth').onchange=$('calendarFilter').onchange=()=>loadCalendar().catch(error=>msg(error.message,true));
 
 $('lang').value=lang;
 // VITALIA: денний календар. Вставити перед останнім translate(); у admin.html
 const originalDrawCalendar = drawCalendar;
-let dayViewRequest = 0;
 const dayClock = value => new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value));
 const dayMins = value => { const [h,m] = String(value).slice(0,5).split(':').map(Number); return h*60+m; };
 const dayTime = value => String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');
@@ -264,15 +304,12 @@ function createDayView(){
     const button=node('button',symbol,'secondary');button.type='button';
     button.onclick=()=>{const date=new Date(selectedCalendarDay+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+delta);
       selectedCalendarDay=date.toISOString().slice(0,10);const month=selectedCalendarDay.slice(0,7);
-      if($('calendarMonth').value!==month){$('calendarMonth').value=month;action(loadCalendar);}else drawCalendar();};
+      if($('calendarMonth').value!==month){$('calendarMonth').value=month;loadCalendar().catch(error=>msg(error.message,true));}else drawCalendar();};
     controls.append(button);
   }
   header.append(title,controls);panel.append(header);
   const schedule=node('div','','');schedule.id='vitaliaDaySchedule';panel.append(schedule);
   $('adminCalendar').insertAdjacentElement('afterend',panel);
-  $('calendarDay').hidden=true;
-  const bookings=$('bookings');const description=bookings.previousElementSibling;const heading=description.previousElementSibling;
-  heading.hidden=true;description.hidden=true;bookings.hidden=true;
   return panel;
 }
 function dayRow(from,to,kind,title,detail,booking){
@@ -455,42 +492,158 @@ function renderTimeline(layout,day,salonId,services,today,currentMinute){
   return timeline;
 }
 
-async function renderDaySchedule(){
-  const request=++dayViewRequest,day=selectedCalendarDay,filter=Number($('calendarFilter').value);
-  const schedule=$('vitaliaDaySchedule');schedule.replaceChildren(node('p',dayLabel('Завантаження розкладу…','טוען יומן…'),'muted'));
-  $('vitaliaDayTitle').textContent=new Date(day+'T12:00:00Z').toLocaleDateString(lang==='he'?'he-IL':'uk-UA',{day:'numeric',month:'long',year:'numeric',weekday:'long'});
-  try{
-    const salons=filter?[filter]:[1,2];
-    const extra=await Promise.all(salons.map(id=>admin('list',{salon_id:id})));
-    if(request!==dayViewRequest)return;
-    schedule.replaceChildren();
-    const appointments=(calendarData.allBookings||[]).filter(b=>b.status==='confirmed')
-      .map(b=>bookingInterval(b,day)).filter(Boolean);
-    const today=localDay(new Date().toISOString());
-    const currentMinute=dayMins(dayClock(new Date()));
-    for(let i=0;i<salons.length;i++){
-      const id=salons[i],data=extra[i],area=node('section','');
-      area.append(node('h3',id===1?'Vitalia Beauty · כפר יונה':'Vitalia Taieb · נתניה'));
-      const slots=(calendarData.slots||[]).filter(s=>Number(s.salon_id)===id&&s.work_date===day).map(s=>({from:dayMins(s.start_time),to:dayMins(s.end_time)}));
-      const breaks=(data.breaks||[]).filter(b=>b.work_date===day).map(b=>({from:dayMins(b.start_time),to:dayMins(b.end_time)}));
-      const holiday=(calendarData.holidays||[]).find(h=>h.holiday_date===day);
-      const override=(data.overrides||[]).find(o=>o.override_date===day);
-      const closed=override?.is_closed===true||(holiday&&override?.is_closed!==false);
-      const services=selectableServices(data,id);
-      if (day >= localDay(new Date().toISOString()) && !closed && services.length) {
-        const add = node('button', dayLabel('Додати запис', 'הוספת תור'));
-        add.type = 'button';
-        add.onclick = () => openManualBooking(day, id, services);
-        area.append(add);
+function showDayManagement(day,id,data,state,mode){
+  let dialog=$('dayManagement');
+  if(!dialog){
+    dialog=node('dialog','','day-timeline-dialog day-management');
+    dialog.id='dayManagement';
+    dialog.setAttribute('aria-labelledby','dayManagementTitle');
+    document.body.append(dialog);
+  }
+  const breaks=mode==='breaks';
+  const title=node('h2',breaks?t('dailyBreak'):t('openHours'));
+  title.id='dayManagementTitle';
+  const context=node('p',day+' · '+salonName(id),'muted');
+  const status=node('p','','muted');
+  status.setAttribute('role','status');
+  const form=node('form','');
+  const fields=node('div','','grid');
+  const from=node('input',''),to=node('input','');
+  from.type=to.type='time';
+  from.required=to.required=true;
+  from.value=breaks?'13:00':'10:00';
+  to.value=breaks?'14:00':'18:00';
+  for(const [name,input] of [[t('from'),from],[t('to'),to]]){
+    const label=node('label',name);
+    label.append(input);
+    fields.append(label);
+  }
+  const buttons=node('div','','actions');
+  const submit=node('button',breaks?t('saveBreak'):state.closed?t('open'):dayLabel('Додати робочі години','הוספת שעות עבודה'));
+  submit.type='submit';
+  const cancel=node('button',dayLabel('Закрити','סגירה'),'secondary');
+  cancel.type='button';
+  cancel.onclick=()=>dialog.close();
+  buttons.append(submit,cancel);
+  form.append(fields,buttons);
+  let hoursSaved=false;
+  let updating=false;
+  async function save(change){
+    if(updating)return;
+    updating=true;
+    dialog.oncancel=event=>event.preventDefault();
+    const controls=[...dialog.querySelectorAll('input,button')];
+    controls.forEach(control=>control.disabled=true);
+    status.textContent=t('busy');
+    try{
+      await change();
+      dialog.close();
+      try{await loadCalendar();msg(t('created'));}
+      catch{msg(dayLabel('Зміни збережено. Онови календар.','השינויים נשמרו. רענני את היומן.'),true);}
+    }catch(error){
+      status.textContent=hoursSaved
+        ?dayLabel('Години збережено. Натисни ще раз, щоб відкрити день.','השעות נשמרו. לחצי שוב כדי לפתוח את היום.')
+        :error.message||t('unavailable');
+    }finally{
+      updating=false;
+      dialog.oncancel=null;
+      controls.forEach(control=>control.disabled=false);
+      if(hoursSaved){from.disabled=to.disabled=true;submit.textContent=t('open');}
+    }
+  }
+  form.onsubmit=event=>{
+    event.preventDefault();
+    if(!hoursSaved&&from.value>=to.value){
+      status.textContent=dayLabel('Час завершення має бути пізніше початку.','שעת הסיום צריכה להיות אחרי שעת ההתחלה.');
+      return;
+    }
+    save(async()=>{
+      if(breaks){
+        await admin('add_break',{salon_id:id,date:day,start:from.value,end:to.value});
+      }else{
+        if(!hoursSaved){
+          await admin('add_slot',{salon_id:id,date:day,start:from.value,end:to.value});
+          hoursSaved=true;
+        }
+        if(state.closed)await admin('close_date',{salon_id:id,date:day,closed:false});
       }
-      if(holiday)area.append(node('p',dayLabel('Єврейське свято: ','חג: ')+(holiday.name_he||''),'muted'));
-      if(closed)area.append(node('p',dayLabel('Дата закрита для онлайн-запису','היום סגור להזמנות'),'muted'));
-      if(!slots.length)area.append(node('p',dayLabel('Робочі години не відкриті','לא הוגדרו שעות עבודה'),'muted'));
-      const layout=timelineLayout(slots,breaks,appointments,id,closed);
-      if(layout)area.append(renderTimeline(layout,day,id,services,today,currentMinute));
+    });
+  };
+  const entries=(breaks?data.breaks||[]:data.slots||[]).filter(item=>item.work_date===day);
+  const list=node('div','');
+  for(const item of entries){
+    const row=node('div','','item');
+    const remove=node('button',t('remove'),'danger');
+    remove.type='button';
+    remove.onclick=()=>{
+      if(confirm(breaks?dayLabel('Прибрати цю перерву?','להסיר את ההפסקה?'):t('confirmDelete'))){
+        save(()=>admin(breaks?'delete_break':'delete_slot',{salon_id:id,id:item.id}));
+      }
+    };
+    row.append(node('span',time(item.start_time)+'–'+time(item.end_time)),remove);
+    list.append(row);
+  }
+  dialog.replaceChildren(title,context,form,status,list);
+  dialog.showModal();
+}
+
+function salonName(id){return id===1?'Vitalia Beauty · כפר יונה':'Vitalia Taieb · נתניה';}
+
+function renderDaySchedule(){
+  const day=selectedCalendarDay;
+  const schedule=$('vitaliaDaySchedule');
+  const controls=node('div','','day-controls');
+  schedule.replaceChildren(controls);
+  $('vitaliaDayTitle').textContent=new Date(day+'T12:00:00Z').toLocaleDateString(lang==='he'?'he-IL':'uk-UA',{day:'numeric',month:'long',year:'numeric',weekday:'long'});
+  const appointments=(calendarData.allBookings||[]).filter(b=>b.status==='confirmed')
+    .map(b=>bookingInterval(b,day)).filter(Boolean);
+  const today=localDay(new Date().toISOString());
+  const currentMinute=dayMins(dayClock(new Date()));
+  for(const id of calendarData.salons||[]){
+    const data=calendarData.schedules[id];
+    const area=node('section','');
+    const settings=node('section','','card');
+    settings.append(node('h3',salonName(id)));
+    const state=calendarDayState(day,id);
+    const {closed,holiday}=state;
+    const slots=state.slots.map(s=>({from:dayMins(s.start_time),to:dayMins(s.end_time)}));
+    const breaks=(data.breaks||[]).filter(b=>b.work_date===day).map(s=>({from:dayMins(s.start_time),to:dayMins(s.end_time)}));
+    const services=selectableServices(data,id);
+    const open=!closed&&slots.length>0;
+    settings.append(node('p',open?dayLabel('Відкрито для онлайн-запису','פתוח להזמנות'):
+      dayLabel('Закрито для онлайн-запису','סגור להזמנות'),'muted'));
+    if(holiday)settings.append(node('p',holiday.name_he||'','muted'));
+    if(day>=today){
+      const buttons=node('div','','actions');
+      const toggle=node('button',open?t('close'):t('open'),open?'danger':'');
+      toggle.type='button';
+      toggle.onclick=()=>{
+        if(!open&&!slots.length){showDayManagement(day,id,data,state,'hours');return;}
+        if(open&&!confirm(t('confirmClose')))return;
+        action(async()=>{await admin('close_date',{salon_id:id,date:day,closed:open});await loadCalendar();});
+      };
+      const hours=node('button',dayLabel('Робочі години','שעות עבודה'),'secondary');
+      hours.type='button';
+      hours.onclick=()=>showDayManagement(day,id,data,state,'hours');
+      const pause=node('button',dayLabel('Перерви','הפסקות'),'secondary');
+      pause.type='button';
+      pause.onclick=()=>showDayManagement(day,id,data,state,'breaks');
+      if(open&&services.length){
+        const add=node('button',dayLabel('Додати запис','הוספת תור'));
+        add.type='button';
+        add.onclick=()=>openManualBooking(day,id,services);
+        buttons.append(add);
+      }
+      buttons.append(toggle,hours,pause);
+      settings.append(buttons);
+    }
+    controls.append(settings);
+    const layout=timelineLayout(slots,breaks,appointments,id,closed);
+    if(layout){
+      area.append(node('h3',salonName(id)),renderTimeline(layout,day,id,services,today,currentMinute));
       schedule.append(area);
     }
-  }catch(err){if(request===dayViewRequest)schedule.replaceChildren(node('p',err.message||dayLabel('Помилка завантаження','שגיאה בטעינה'),'error'));}
+  }
 }
 drawCalendar=function(){
   const month=$('calendarMonth').value;
@@ -500,7 +653,7 @@ drawCalendar=function(){
   const details=$('dayTimelineDetails');
   if(details?.open)details.close();
   originalDrawCalendar();createDayView();renderDaySchedule();
-  $('adminCalendar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{$('vitaliaDayView').scrollIntoView({behavior:'smooth',block:'start'});}));
+  $('adminCalendar').querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>{$('vitaliaDayView').scrollIntoView({behavior:'smooth',block:'start'});}));
 }
  const oldDayRow = dayRow;
 
