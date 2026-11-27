@@ -23,6 +23,14 @@
 .day-timeline-booking-client,.day-timeline-booking-service{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:5px;unicode-bidi:plaintext}
 .day-timeline-booking-client{padding-block-start:3px}
 .day-timeline-booking-service{font-weight:400;color:#edd8ce}
+.day-timeline[data-salon-id="2"] .day-timeline-booking {
+  background: #42265f;
+  color: #f4eaff;
+  border-color: #ae82d4;
+  border-inline-start-color: #ce9cff;
+}
+.day-timeline[data-salon-id="2"] .day-timeline-booking-time { background: #603785; }
+.day-timeline[data-salon-id="2"] .day-timeline-booking-service { color: #e9d9f8; }
 .day-timeline-dialog{width:min(92vw,530px);max-height:90vh;overflow:auto;background:#181818;color:#f5eddd;border:1px solid #79673f;border-radius:14px;padding:16px}
 .day-timeline-dialog::backdrop{background:#000a}
 .day-controls{display:grid;gap:8px;margin:12px 0}
@@ -430,6 +438,7 @@ function showTimelineBooking(item){
 
 function renderTimeline(layout,day,salonId,services,today,currentMinute){
   const timeline=node('div','','day-timeline');
+  timeline.dataset.salonId=String(salonId);
   const lane=node('div','','day-timeline-lane');
   const minute=value=>'calc('+value+' * var(--minute))';
   const at=time=>minute(time-layout.from);
