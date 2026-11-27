@@ -47,6 +47,10 @@ details>summary{cursor:pointer;color:var(--gold);font-weight:700}
 <body>
 <header><strong>VITALIA</strong><div class="actions"><select id="lang" class="lang" aria-label="Language"><option value="uk">Українська</option><option value="he">עברית</option></select><button id="signout" class="secondary hidden" type="button" data-t="logout">Вийти</button></div></header>
 <main>
+<div id="adminUpdate" class="status hidden" role="status">
+  <span data-t="updateAvailable">Доступна нова версія адмінки.</span>
+  <button id="applyAdminUpdate" type="button" class="secondary" data-t="applyUpdate">Оновити адмінку</button>
+</div>
 <section id="authCard" class="card"><h1 data-t="admin">Адміністративний кабінет</h1><p class="muted" data-t="loginHelp">Увійдіть або створіть власний обліковий запис адміністратора. Новий обліковий запис потребує підтвердження прав доступу.</p><form id="authForm"><div class="grid"><div><label for="email">Email</label><input id="email" type="email" autocomplete="email" required></div><div><label for="password" data-t="password">Пароль</label><input id="password" type="password" minlength="8" autocomplete="current-password" required></div></div><div class="actions" style="margin-top:12px"><button id="loginBtn" type="submit" data-t="login">Увійти</button><button id="signupBtn" type="button" class="secondary" data-t="createAccount">Створити обліковий запис</button></div></form><p id="authMsg" class="muted" role="status"></p></section>
 <section id="dashboard" class="hidden">
 <div id="status" role="status" aria-live="polite" class="status hidden"></div>
@@ -93,6 +97,51 @@ Object.assign(dict.he,{serviceSettings:'ניהול טיפולים',calendarTitle
 let lang=localStorage.getItem('vitalia_lang')||'uk',salon=1,accessToken=null,refreshToken=null,expiresAt=0,refreshing=null;
 const t=k=>dict[lang][k]||k;
 function translate(){document.documentElement.lang=lang;document.documentElement.dir=lang==='he'?'rtl':'ltr';document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));}
+Object.assign(dict.uk,{updateAvailable:'Доступна нова версія адмінки.',applyUpdate:'Оновити адмінку'});
+Object.assign(dict.he,{updateAvailable:'גרסה חדשה של ממשק הניהול זמינה.',applyUpdate:'עדכון ממשק הניהול'});
+
+const adminPageSource=document.documentElement.innerHTML;
+const updateParameter='_vitalia_update';
+let adminPageUsed=false;
+let checkingAdminUpdate=false;
+for(const event of ['pointerdown','keydown','input','click']){
+  document.addEventListener(event,()=>{adminPageUsed=true;},{capture:true,once:true});
+}
+function reloadAdminPage(){
+  const url=new URL(location.href);
+  url.searchParams.set(updateParameter,String(Date.now()));
+  location.replace(url.href);
+}
+$('applyAdminUpdate').onclick=reloadAdminPage;
+async function checkAdminUpdate(){
+  if(document.visibilityState!=='visible'||checkingAdminUpdate)return;
+  checkingAdminUpdate=true;
+  try{
+    const response=await fetch(location.pathname,{cache:'no-store'});
+    if(!response.ok)return;
+    const page=new DOMParser().parseFromString(await response.text(),'text/html');
+    if(!page.getElementById('calendarCard')||!page.getElementById('authForm'))return;
+    if(page.documentElement.innerHTML===adminPageSource){
+      $('adminUpdate').classList.add('hidden');
+      return;
+    }
+    const lastUpdate=Number(new URLSearchParams(location.search).get(updateParameter));
+    if(!adminPageUsed&&!document.querySelector('dialog[open]')&&!$('password').value
+        &&document.visibilityState==='visible'&&Date.now()-lastUpdate>60000){
+      reloadAdminPage();
+    }else{
+      $('adminUpdate').classList.remove('hidden');
+    }
+  }catch{
+    // Keep the current page usable when the network is unavailable.
+  }finally{
+    checkingAdminUpdate=false;
+  }
+}
+window.addEventListener('pageshow',checkAdminUpdate);
+document.addEventListener('visibilitychange',checkAdminUpdate);
+checkAdminUpdate();
+
 function msg(value,error=false){$('status').textContent=value;$('status').className='status '+(error?'error':'ok');$('status').classList.remove('hidden');}
 function authMsg(value,error=false){$('authMsg').textContent=value;$('authMsg').className=error?'error':'muted';}
 function busy(flag){
