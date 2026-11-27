@@ -88,8 +88,8 @@ const $=id=>document.getElementById(id);
 const dict={uk:{admin:'Адміністративний кабінет',loginHelp:'Увійдіть або створіть власний обліковий запис адміністратора. Новий обліковий запис потребує підтвердження прав доступу.',password:'Пароль',login:'Увійти',createAccount:'Створити обліковий запис',logout:'Вийти',schedule:'Керування графіком',flexible:'Відкривайте будь-які дати для кожного салону. Запис у двох салонах не повинен перетинатися.',refresh:'Оновити',openHours:'Відкрити години для запису',date:'Дата',from:'Початок',to:'Кінець',open:'Відкрити дату',close:'Закрити дату',reopen:'Скасувати закриття',noRecurring:'Графік не прив’язаний до днів тижня: ви обираєте конкретні дати.',datesOpen:'Відкриті дати та години',bookings:'Записи клієнтів',bookingsHelp:'Тут відображаються бронювання обраного салону.',loading:'Завантаження…',closures:'Закриті дати',empty:'Немає записів',remove:'Прибрати',created:'Готово, збережено.',confirmDelete:'Прибрати ці години?',confirmClose:'Закрити обрану дату для клієнтів?',signupDone:'Обліковий запис створено. Перевірте електронну пошту, якщо потрібно підтвердження. Для доступу власника необхідне окреме схвалення.',notAuthorized:'Вхід виконано, але права адміністратора ще не налаштовані. Повідомте про це в чаті, пароль нікому не надсилайте.',loginFail:'Помилка входу',pickDate:'Оберіть дату',busy:'Виконується…',unavailable:'Не вдалося отримати дані',expired:'Сеанс завершився. Увійдіть повторно.',dailyBreak:'Перерва в робочому дні',saveBreak:'Додати перерву',breakExplainer:'Клієнти не зможуть обрати час, який перетинається з перервою.',serviceBreak:'Пауза після процедури',procedure:'Процедура',pauseMinutes:'Пауза (хвилин)',savePause:'Зберегти паузу',pauseExplainer:'Час після процедури резервується до наступного запису.'},he:{admin:'ניהול VITALIA',loginHelp:'כניסה או יצירת חשבון מנהל. חשבון חדש דורש אישור הרשאות.',password:'סיסמה',login:'כניסה',createAccount:'יצירת חשבון',logout:'יציאה',schedule:'ניהול יומן העבודה',flexible:'פתחי ימים ושעות לפי בחירתך עבור כל סניף, ללא קביעת ימים קבועים.',refresh:'רענון',openHours:'פתיחת שעות להזמנה',date:'תאריך',from:'התחלה',to:'סיום',open:'פתיחת יום',close:'סגירת יום',reopen:'ביטול סגירה',noRecurring:'אין ימי עבודה קבועים. בחרי כל תאריך בנפרד.',datesOpen:'תאריכים ושעות פתוחים',bookings:'תורים',bookingsHelp:'תורים בסניף הנבחר.',loading:'טוען…',closures:'ימים סגורים',empty:'אין רשומות',remove:'מחיקה',created:'נשמר בהצלחה.',confirmDelete:'למחוק שעות אלה?',confirmClose:'לסגור את התאריך לתורים?',signupDone:'החשבון נוצר. בדקי דוא״ל לאישור. נדרש אישור הרשאות מנהל.',notAuthorized:'נכנסת, אך עדיין אין הרשאת מנהל. אין לשלוח סיסמה.',loginFail:'שגיאה בכניסה',pickDate:'בחרי תאריך',busy:'מעבד…',unavailable:'לא ניתן לטעון נתונים',expired:'ההתחברות פגה. התחברי מחדש.',dailyBreak:'הפסקה במהלך יום העבודה',saveBreak:'הוספת הפסקה',breakExplainer:'לא ניתן להזמין טיפול שחופף להפסקה.',serviceBreak:'הפסקה אחרי טיפול',procedure:'טיפול',pauseMinutes:'הפסקה (דקות)',savePause:'שמירת הפסקה',pauseExplainer:'הזמן אחרי כל טיפול יישמר לפני התור הבא.'}};
 Object.assign(dict.uk,{serviceEditor:'Прайс обраного салону',serviceHint:'Назви для клієнтів — івритом. Зміни застосовуються до нових записів; час наявних записів зберігається.',serviceName:'Назва івритом',servicePrice:'Ціна (₪)',serviceDuration:'Тривалість (хвилин)',saveService:'Зберегти процедуру',newService:'＋ Нова процедура',confirmService:'Зберегти зміни прайсу обраного салону?'});
 Object.assign(dict.he,{serviceEditor:'מחירון הסניף הנבחר',serviceHint:'שמות הטיפולים ללקוחות בעברית. השינויים יחולו על הזמנות חדשות; זמני תורים קיימים נשמרים.',serviceName:'שם הטיפול בעברית',servicePrice:'מחיר (₪)',serviceDuration:'משך הטיפול (דקות)',saveService:'שמירת טיפול',newService:'＋ טיפול חדש',confirmService:'לשמור את השינויים במחירון הסניף הנבחר?'});
-Object.assign(dict.uk,{serviceSettings:'Керування послугами',calendarTitle:'Календар',bothSalons:'Обидва салони',salonLabel:'Салон'});
-Object.assign(dict.he,{serviceSettings:'ניהול טיפולים',calendarTitle:'יומן',bothSalons:'שני הסניפים',salonLabel:'סניף'});
+Object.assign(dict.uk,{serviceSettings:'Керування послугами',calendarTitle:'Календар',bothSalons:'Обидва салони',salonLabel:'Салон',today:'Сьогодні'});
+Object.assign(dict.he,{serviceSettings:'ניהול טיפולים',calendarTitle:'יומן',bothSalons:'שני הסניפים',salonLabel:'סניף',today:'היום'});
 let lang=localStorage.getItem('vitalia_lang')||'uk',salon=1,accessToken=null,refreshToken=null,expiresAt=0,refreshing=null;
 const t=k=>dict[lang][k]||k;
 function translate(){document.documentElement.lang=lang;document.documentElement.dir=lang==='he'?'rtl':'ltr';document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));}
@@ -300,6 +300,18 @@ manualForm.addEventListener('submit', async event => {
   }
 });
 
+function goToCalendarDay(day){
+  selectedCalendarDay=day;
+  const month=day.slice(0,7);
+  const monthInput=$('calendarMonth');
+  if(monthInput.value===month){
+    drawCalendar();
+    return;
+  }
+  monthInput.value=month;
+  loadCalendar().catch(error=>msg(error.message,true));
+}
+
 function createDayView(){
   let panel=$('vitaliaDayView');
   if(panel)return panel;
@@ -308,11 +320,18 @@ function createDayView(){
   const header=document.createElement('div');header.style.cssText='display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap';
   const title=document.createElement('h2');title.id='vitaliaDayTitle';title.style.margin='0';
   const controls=document.createElement('div');controls.className='actions';
+  const today=node('button',t('today'),'secondary');
+  today.type='button';
+  today.dataset.t='today';
+  today.onclick=()=>goToCalendarDay(localDay(new Date().toISOString()));
   for(const [delta,symbol] of [[-1,'‹'],[1,'›']]){
     const button=node('button',symbol,'secondary');button.type='button';
-    button.onclick=()=>{const date=new Date(selectedCalendarDay+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+delta);
-      selectedCalendarDay=date.toISOString().slice(0,10);const month=selectedCalendarDay.slice(0,7);
-      if($('calendarMonth').value!==month){$('calendarMonth').value=month;loadCalendar().catch(error=>msg(error.message,true));}else drawCalendar();};
+    button.onclick=()=>{
+      const date=new Date(selectedCalendarDay+'T12:00:00Z');
+      date.setUTCDate(date.getUTCDate()+delta);
+      goToCalendarDay(date.toISOString().slice(0,10));
+    };
+    if(delta===1)controls.append(today);
     controls.append(button);
   }
   header.append(title,controls);panel.append(header);
