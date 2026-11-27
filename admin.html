@@ -6,13 +6,25 @@
 <style>
 :root{--gold:#d9b568;--bg:#0d0d0d;--panel:#181818;--muted:#b7b1a6;--border:#4d4129}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f5eddd;font:16px system-ui,-apple-system,Arial,sans-serif}header{padding:20px max(16px,env(safe-area-inset-left));border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}header strong{color:var(--gold);letter-spacing:3px;font-size:24px}main{max-width:1100px;margin:auto;padding:16px 16px 50px}h1,h2{color:var(--gold)}h1{font-size:26px}h2{font-size:19px;margin:0 0 14px}.card{padding:18px;border:1px solid var(--border);background:var(--panel);border-radius:14px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.twocol{grid-template-columns:1fr}}label{display:block;color:var(--gold);font-size:14px;margin-bottom:6px}input,select,button{font:inherit;max-width:100%}input,select{background:#0d0d0d;color:#fff;border:1px solid #79673f;padding:12px;border-radius:9px;width:100%;min-height:45px}button{padding:12px 16px;background:var(--gold);color:#17120b;border:0;border-radius:9px;font-weight:700;min-height:45px;cursor:pointer}button.secondary{background:transparent;color:var(--gold);border:1px solid var(--gold)}button.danger{background:#532a26;color:#ffe9e7;border:1px solid #bf7c77}button:disabled{opacity:.5;cursor:wait}.actions{display:flex;gap:9px;flex-wrap:wrap;align-items:end}.actions>*{flex:1 1 auto}.muted{color:var(--muted);font-size:14px;line-height:1.5}.error{color:#ffb6b6}.ok{color:#c9e6b9}.status{padding:10px 12px;border-radius:8px;border:1px solid var(--border);margin:12px 0;white-space:pre-wrap}.hidden{display:none!important}.item{padding:12px 0;border-bottom:1px solid #393126;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}.item:last-child{border-bottom:0}.item b{color:var(--gold)}.small{font-size:13px}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button{flex:1 1 130px}.tabselected{box-shadow:inset 0 0 0 2px #fff}.lang{width:auto;min-width:140px}.pill{color:var(--gold);border:1px solid var(--border);padding:6px 10px;border-radius:99px}.sr{position:absolute;left:-9999px}a{color:var(--gold)}
 .month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:16px 0}.month-grid button{padding:7px 2px;min-height:64px;font-size:13px;background:#262015;color:var(--gold);border:1px solid #79673f}.month-grid .selected{outline:2px solid white}.month-grid small{display:block;font-size:11px}.month-grid .holiday{border-color:#bd6f5b}
-.day-grid{display:grid;gap:5px;margin-block:12px 20px}
-.day-grid-row{display:grid;grid-template-columns:3.8rem minmax(0,1fr);gap:8px;align-items:start;min-height:45px;padding:6px 8px;border-inline-start:4px solid #8c8c8c;border-radius:8px;background:#252525}
-.day-grid-time{font-variant-numeric:tabular-nums;align-self:center;text-align:center;direction:ltr}
-.day-grid-state{align-self:center}
-.day-grid-free{background:#163523;color:#dcfce7;border-color:#61cd84}
-.day-grid-busy{background:#472326;color:#ffe9e7;border-color:#f37d7d}
-.day-grid-book{background:transparent;color:inherit;border:1px solid #61cd84;text-align:start;padding:5px 10px;min-height:32px}
+.day-timeline{--minute:2px;--gutter:3.7rem;position:relative;margin:14px 0 24px;isolation:isolate;direction:ltr;border-block-end:1px solid #51452f}
+.day-timeline-lane{position:absolute;inset:0 0 0 var(--gutter);border:1px solid #51452f;border-radius:8px;overflow:hidden}
+.day-timeline-tick{position:absolute;left:0;width:var(--gutter);padding-inline-end:.5rem;text-align:right;font-size:.75rem;font-variant-numeric:tabular-nums;color:#b7b1a6}
+.day-timeline-tick.hour{color:#f5eddd;font-weight:700}
+.day-timeline-zone{position:absolute;inset-inline:0;background:repeating-linear-gradient(135deg,#252525 0 7px,#2d2b26 7px 8px)}
+.day-timeline-zone.free{background:#193925}
+.day-timeline-zone.other{background:repeating-linear-gradient(135deg,#452326 0 7px,#633136 7px 8px)}
+.day-timeline-line{position:absolute;inset-inline:0;border-top:1px solid #f5eddd24;pointer-events:none}
+.day-timeline-line.hour{border-color:#f5eddd50}
+.day-timeline-add{position:absolute;inset-inline:0;min-height:0;padding:0 8px;background:transparent;color:#c1e9cb;text-align:right;font-size:.9rem;border-radius:0}
+.day-timeline-add:hover,.day-timeline-add:focus-visible{background:#6acd832b}
+.day-timeline-booking{position:absolute;min-height:0;min-width:0;padding:0;overflow:hidden;display:flex;flex-direction:column;align-items:stretch;text-align:start;background:#472326;color:#ffe9e7;border:1px solid #d47b7b;border-inline-start:4px solid #f37d7d;border-radius:7px;font-size:.85rem;line-height:1.25}
+.day-timeline-booking:focus-visible,.day-timeline-add:focus-visible{outline:2px solid #fff;outline-offset:-3px;z-index:2}
+.day-timeline-booking-time{display:block;padding:2px 5px;background:#71353b;direction:ltr;text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+.day-timeline-booking-client,.day-timeline-booking-service{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:5px;unicode-bidi:plaintext}
+.day-timeline-booking-client{padding-block-start:3px}
+.day-timeline-booking-service{font-weight:400;color:#edd8ce}
+.day-timeline-dialog{width:min(92vw,530px);max-height:90vh;overflow:auto;background:#181818;color:#f5eddd;border:1px solid #79673f;border-radius:14px;padding:16px}
+.day-timeline-dialog::backdrop{background:#000a}
 </style>
 </head>
 <body>
@@ -319,31 +331,128 @@ function bookingInterval(booking,day){
   return to>from?{from,to,treatmentTo:Math.min(to,Math.max(from,treatmentTo)),booking}:null;
 }
 
-function halfHourRows(slots,breaks,appointments,salonId,closed){
+function timelineLayout(slots,breaks,appointments,salonId,closed){
   const own=appointments.filter(item=>Number(item.booking.salon_id)===salonId);
-  const bounds=[...slots,...breaks,...own];
-  if(!bounds.length)return [];
-  const from=Math.floor(Math.min(...bounds.map(item=>item.from))/30)*30;
-  const to=Math.ceil(Math.max(...bounds.map(item=>item.to))/30)*30;
-  const orderedSlots=[...slots].sort((a,b)=>a.from-b.from);
-  const rows=[];
-  for(let start=from;start<to;start+=30){
-    const end=start+30;
-    const overlaps=item=>item.from<end&&item.to>start;
-    const starts=own.filter(item=>item.from>=start&&item.from<end);
-    const occupied=own.some(overlaps);
-    const hasWorkingTime=!closed&&orderedSlots.some(overlaps);
-    const otherSalon=hasWorkingTime&&appointments.some(item=>Number(item.booking.salon_id)!==salonId&&overlaps(item));
-    let coveredUntil=start;
-    for(const slot of orderedSlots){
-      if(slot.from>coveredUntil)break;
-      coveredUntil=Math.max(coveredUntil,slot.to);
-    }
-    const kind=occupied?'busy':otherSalon?'other':breaks.some(overlaps)?'break':
-      !hasWorkingTime?'closed':coveredUntil>=end?'free':'partial';
-    rows.push({start,starts,kind});
+  const other=appointments.filter(item=>Number(item.booking.salon_id)!==salonId);
+  const hours=[...slots,...breaks,...own];
+  if(!hours.length)return null;
+  const from=Math.floor(Math.min(...hours.map(item=>item.from))/30)*30;
+  const to=Math.ceil(Math.max(...hours.map(item=>item.to))/30)*30;
+  const ticks=[];
+  for(let time=from;time<to;time+=30)ticks.push(time);
+
+  const boundaries=[...new Set([from,to,...[...slots,...breaks,...appointments].flatMap(item=>[item.from,item.to])])]
+    .filter(time=>time>=from&&time<=to).sort((a,b)=>a-b);
+  const zones=[];
+  for(let i=0;i<boundaries.length-1;i++){
+    const start=boundaries[i],end=boundaries[i+1];
+    const covers=item=>item.from<=start&&item.to>=end;
+    const kind=closed||!slots.some(covers)?'closed':breaks.some(covers)?'break':
+      other.some(covers)?'other':own.some(covers)?'busy':'free';
+    const previous=zones[zones.length-1];
+    if(previous?.kind===kind)previous.to=end;
+    else zones.push({from:start,to:end,kind});
   }
-  return rows;
+
+  const groups=[];
+  for(const item of [...own].sort((a,b)=>a.from-b.from||b.to-a.to)){
+    let group=groups[groups.length-1];
+    if(!group||group.to<=item.from){
+      group={to:item.to,laneEnds:[],items:[]};
+      groups.push(group);
+    }
+    let lane=group.laneEnds.findIndex(end=>end<=item.from);
+    if(lane<0)lane=group.laneEnds.length;
+    group.laneEnds[lane]=item.to;
+    group.to=Math.max(group.to,item.to);
+    group.items.push({...item,lane});
+  }
+  const cards=groups.flatMap(group=>group.items.map(item=>({...item,columns:group.laneEnds.length})));
+  return {from,to,ticks,zones,cards};
+}
+
+function showTimelineBooking(item){
+  let dialog=$('dayTimelineDetails');
+  if(!dialog){
+    dialog=node('dialog','','day-timeline-dialog');
+    dialog.id='dayTimelineDetails';
+    dialog.setAttribute('aria-labelledby','dayTimelineDetailsTitle');
+    document.body.append(dialog);
+  }
+  const {from,treatmentTo,booking}=item;
+  const title=node('h2',dayLabel('Деталі запису','פרטי התור'));
+  title.id='dayTimelineDetailsTitle';
+  const detail=[booking.service_name,booking.client_phone].filter(Boolean).join(' · ');
+  const card=dayRow(from,treatmentTo,'booking',booking.client_name||dayLabel('Клієнт','לקוח'),detail,booking);
+  const close=node('button',dayLabel('Закрити','סגירה'),'secondary');
+  close.type='button';
+  close.onclick=()=>dialog.close();
+  dialog.replaceChildren(title,card,close);
+  dialog.showModal();
+}
+
+function renderTimeline(layout,day,salonId,services,today,currentMinute){
+  const timeline=node('div','','day-timeline');
+  const lane=node('div','','day-timeline-lane');
+  const minute=value=>'calc('+value+' * var(--minute))';
+  const at=time=>minute(time-layout.from);
+  const position=(element,item)=>{
+    element.style.top=at(item.from);
+    element.style.height=minute(item.to-item.from);
+  };
+  timeline.style.height=minute(layout.to-layout.from);
+  timeline.append(lane);
+  const labels={
+    closed:dayLabel('Закрито','סגור'),
+    free:dayLabel('Вільний час','זמן פנוי'),
+    break:dayLabel('Перерва','הפסקה'),
+    other:dayLabel('Запис в іншому салоні','תור בסניף השני'),
+    busy:dayLabel('Запис','תור'),
+  };
+  for(const zone of layout.zones){
+    const block=node('div','','day-timeline-zone '+zone.kind);
+    position(block,zone);
+    block.title=labels[zone.kind]+' · '+dayTime(zone.from)+'–'+dayTime(zone.to);
+    lane.append(block);
+  }
+  for(const tick of layout.ticks){
+    const emphasis=tick%60===0?' hour':'';
+    const clock=dayTime(tick);
+    const label=node('span',clock,'day-timeline-tick'+emphasis);
+    label.style.top=at(tick);
+    const line=node('div','','day-timeline-line'+emphasis);
+    line.style.top=at(tick);
+    timeline.append(label);
+    lane.append(line);
+
+    const canBook=services.length&&(day>today||(day===today&&tick>currentMinute));
+    if(canBook&&layout.zones.some(z=>z.kind==='free'&&z.from<=tick&&z.to>=tick+30)){
+      const button=node('button','+','day-timeline-add');
+      button.type='button';
+      button.setAttribute('aria-label',dayLabel('Додати запис на ','הוספת תור בשעה ')+clock);
+      position(button,{from:tick,to:tick+30});
+      button.onclick=()=>openManualBooking(day,salonId,services,clock);
+      lane.append(button);
+    }
+  }
+  for(const item of layout.cards){
+    const booking=item.booking;
+    const time=dayTime(item.from)+'–'+dayTime(item.treatmentTo);
+    const client=booking.client_name||dayLabel('Клієнт','לקוח');
+    const service=booking.service_name||'';
+    const card=node('button','','day-timeline-booking');
+    card.type='button';
+    card.title=[time,client,service].filter(Boolean).join(' · ');
+    card.setAttribute('aria-label',card.title);
+    card.append(node('span',time,'day-timeline-booking-time'),
+      node('strong',client,'day-timeline-booking-client'),node('span',service,'day-timeline-booking-service'));
+    position(card,item);
+    card.style.left='calc('+(item.lane*100/item.columns)+'% + 2px)';
+    card.style.width='calc('+(100/item.columns)+'% - 4px)';
+    card.onclick=()=>showTimelineBooking(item);
+    lane.append(card);
+  }
+  return timeline;
 }
 
 async function renderDaySchedule(){
@@ -377,38 +486,8 @@ async function renderDaySchedule(){
       if(holiday)area.append(node('p',dayLabel('Єврейське свято: ','חג: ')+(holiday.name_he||''),'muted'));
       if(closed)area.append(node('p',dayLabel('Дата закрита для онлайн-запису','היום סגור להזמנות'),'muted'));
       if(!slots.length)area.append(node('p',dayLabel('Робочі години не відкриті','לא הוגדרו שעות עבודה'),'muted'));
-      const grid=node('div','','day-grid');
-      const labels={
-        busy:dayLabel('Зайнято','תפוס'),
-        other:dayLabel('Зайнято в іншому салоні','תפוס בסניף השני'),
-        break:dayLabel('Перерва','הפסקה'),
-        closed:dayLabel('Закрито','סגור'),
-        free:dayLabel('Вільно','פנוי'),
-        partial:dayLabel('Неповні 30 хв','פחות מ־30 דקות'),
-      };
-      for(const {start,starts,kind} of halfHourRows(slots,breaks,appointments,id,closed)){
-        const state=kind==='other'?'busy':kind;
-        const row=node('div','','day-grid-row day-grid-'+state);
-        const clock=dayTime(start);
-        row.append(node('b',clock,'day-grid-time'));
-        const content=node('div','','day-grid-state');
-        for(const {from,treatmentTo,booking} of starts){
-          content.append(dayRow(from,treatmentTo,'booking',booking.client_name||dayLabel('Клієнт','לקוח'),
-            (booking.service_name||'')+' · '+(booking.client_phone||''),booking));
-        }
-        if(kind==='free'&&services.length&&(day>today||(day===today&&start>currentMinute))){
-          const book=node('button',labels.free,'day-grid-book');
-          book.type='button';
-          book.setAttribute('aria-label',dayLabel('Додати запис на ','הוספת תור בשעה ')+clock);
-          book.onclick=()=>openManualBooking(day,id,services,clock);
-          content.append(book);
-        }else if(!starts.length){
-          content.append(node('span',labels[kind]));
-        }
-        row.append(content);
-        grid.append(row);
-      }
-      if(grid.childElementCount)area.append(grid);
+      const layout=timelineLayout(slots,breaks,appointments,id,closed);
+      if(layout)area.append(renderTimeline(layout,day,id,services,today,currentMinute));
       schedule.append(area);
     }
   }catch(err){if(request===dayViewRequest)schedule.replaceChildren(node('p',err.message||dayLabel('Помилка завантаження','שגיאה בטעינה'),'error'));}
@@ -418,6 +497,8 @@ drawCalendar=function(){
   if(!selectedCalendarDay.startsWith(month)){
     const today=localDay(new Date().toISOString());selectedCalendarDay=today.startsWith(month)?today:month+'-01';
   }
+  const details=$('dayTimelineDetails');
+  if(details?.open)details.close();
   originalDrawCalendar();createDayView();renderDaySchedule();
   $('adminCalendar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{$('vitaliaDayView').scrollIntoView({behavior:'smooth',block:'start'});}));
 }
